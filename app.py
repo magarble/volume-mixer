@@ -43,8 +43,9 @@ class Mixer(tk.Tk):
         self.calibration_selection = ()
         self.calibration_pattern = tk.StringVar(value=next(iter(PATTERNS)))
         self.calibration_level = tk.DoubleVar(value=20)
+        self.calibration_tempo = tk.StringVar(value='90')
         self.calibration_audition = tk.StringVar(value='both')
-        self.calibration_status = tk.StringVar(value='Choose two devices, then play the alignment clicks.')
+        self.calibration_status = tk.StringVar(value='Choose two devices, a sound and a tempo, then play the test.')
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.style()
         header = ttk.Frame(self, padding=(26, 22))
@@ -270,7 +271,7 @@ class Mixer(tk.Tk):
         self.calibration_selection = selected
         self.calibration_controls = CalibrationControls(
             frame, candidates, selected, self.calibration_pattern, self.calibration_level,
-            self.calibration_audition, self.bridge.calibrating, self.calibration_status,
+            self.calibration_audition, self.calibration_tempo, self.bridge.calibrating, self.calibration_status,
             self.start_alignment_test, self.stop_alignment_test, self.update_alignment_test,
             self.select_alignment_outputs)
         self.calibration_controls.pack(fill='x', padx=8, pady=(0, 16))
@@ -317,7 +318,7 @@ class Mixer(tk.Tk):
             if self.bridge.calibration_only:
                 self.bridge_outputs = tuple(outputs)
                 self.bridge_name = 'Alignment test'
-            self.calibration_status.set('Playing test clicks. Add delay to the faster output until the double tap sounds like one.')
+            self.calibration_status.set('Playing the alignment sound. Delay the faster output until the two hits sound like one.')
             self.calibration_controls.set_running(True)
             self.build_sync_device_cards()
         self.action(start)
@@ -539,7 +540,7 @@ class Mixer(tk.Tk):
                     if calibration_status:
                         calibration_status.set(text)
                 elif kind == 'ready' and getattr(self.bridge, 'calibrating', False):
-                    self.calibration_status.set('Clicks are playing. Adjust the faster output until the double tap sounds like one.')
+                    self.calibration_status.set('Test sound is playing. Delay the faster output until the two hits sound like one.')
                     self.build_sync_device_cards()
                 self.status.set(text)
         except queue.Empty:

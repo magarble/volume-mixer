@@ -80,13 +80,14 @@ def main():
             if test.error:
                 raise RuntimeError(test.error)
             time.sleep(.6)
-            test.update_calibration((virtual[1].id, virtual[2].id), pattern='burst', level=0, audition='a')
-            time.sleep(.15)
+            for pattern, bpm in (('ding', 120), ('bell', 180), ('bass', 240), ('woodblock', 90), ('burst', 60)):
+                test.update_calibration((virtual[1].id, virtual[2].id), pattern=pattern, level=0, audition='a', bpm=bpm)
+                time.sleep(.1)
             if test.error:
                 raise RuntimeError(test.error)
         finally:
             test.end_calibration()
-        print('Standalone calibration transport, solo, signal switching and shutdown passed at zero test volume.')
+        print('Standalone calibration sounds, live tempo switching, solo and shutdown passed at zero test volume.')
     else:
         print('Bridge hardware smoke test skipped: three unused virtual endpoints required.')
 

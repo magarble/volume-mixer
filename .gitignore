@@ -6,6 +6,7 @@ dist/
 dist-updated/
 dist-sync/
 dist-calibration/
+dist-tempo/
 *.spec
 *.log
 .pytest_cache/

@@ -59,8 +59,8 @@ class Bridge:
                 self._generation += 1
             self._calibration = settings
 
-    def start_calibration(self, outputs, pattern='click', level=20, audition='both'):
-        settings = CalibrationSettings(tuple(outputs), pattern, level, audition)
+    def start_calibration(self, outputs, pattern='click', level=20, audition='both', bpm=90):
+        settings = CalibrationSettings(tuple(outputs), pattern, level, audition, bpm)
         running = self.thread and self.thread.is_alive()
         if running:
             if not self.ready.is_set() or self.error:
@@ -78,9 +78,9 @@ class Bridge:
             self._set_calibration(None)
             raise
 
-    def update_calibration(self, outputs, pattern='click', level=20, audition='both'):
+    def update_calibration(self, outputs, pattern='click', level=20, audition='both', bpm=90):
         if self.calibrating:
-            settings = CalibrationSettings(tuple(outputs), pattern, level, audition)
+            settings = CalibrationSettings(tuple(outputs), pattern, level, audition, bpm)
             if any(output not in self.outputs for output in settings.outputs):
                 raise ValueError('A chosen output is not playing in the current test.')
             self._set_calibration(settings)
@@ -183,7 +183,7 @@ class Bridge:
                     if signal_generation[0] != generation:
                         generator = CalibrationSignal()
                         signal_generation[0] = generation
-                    test = generator.render(len(data), settings.pattern, settings.level)
+                    test = generator.render(len(data), settings.pattern, settings.level, settings.bpm)
                     silence = np.zeros_like(test)
                 else:
                     data = amplify(data, self.gain)

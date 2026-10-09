@@ -4,7 +4,7 @@ A Windows desktop mixer with friendly application names, per-program volume and 
 
 ## Run
 
-Double-click `dist-calibration/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
+Double-click `dist-tempo/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
 
 For development, install Python 3.11 or newer on Windows 10/11, then run:
 
@@ -60,12 +60,16 @@ Settings are remembered by Windows endpoint ID at `%LOCALAPPDATA%\VolumeMixer\ou
 The **Listen and line up** panel in Output sync plays identical test sounds through the same per-output delay buffers used for shared audio.
 
 1. Select **Output A** (usually your faster headset) and **Output B** (usually your slower Bluetooth speaker).
-2. Choose **Short click (recommended)** and click **Play alignment clicks**. The initial test level is 20%; increase the test volume only as needed to hear both devices clearly.
+2. Choose a sound and tempo, then click **Play alignment sound**. The default is **Short click** at **90 BPM**. The initial test level is 20%; increase it as needed to hear both devices clearly.
 3. Use **A only** and **B only** to identify each output. Switch back to **Both together** for alignment.
 4. Listen from your usual position. Adjust the faster output using the slider/5 ms steps, then use the 1 ms buttons to make the double tap sound as close to one tap as possible.
 5. Pause and restart the test to re-check your match. Stop with **Stop test / resume audio**. Delay settings stay saved.
 
-Clicks repeat every 2 seconds, with a short initial settling interval. The alternate **Soft noise burst** uses a longer transient if the click is difficult to hear. Both devices receive the same waveform and sample timing; their individual delays still apply. Calibration volume bypasses normal boost and peaks are bounded separately.
+Choose **Short click**, **Woodblock**, **Bright ding**, **Soft bell**, **Bass bump**, or **Soft noise burst**. The synthesized sounds have a short attack and tapered ending. Bell/ding provide pitched alternatives; bass bump is a short descending kick-like tone. Short click remains the default for judging closely spaced hits.
+
+Tempo can be set from **30 to 240 BPM**, with presets at **30, 60, 90, 120, 150, 180, and 240 BPM**. At 90 BPM a hit repeats about every 667 ms; 120 BPM gives 500 ms and 240 BPM gives 250 ms. Sound, volume and tempo can all change while the test plays. Tempo changes use a brief settling interval before restarting the beat.
+
+Use a slower tempo when aligning large delays: an offset equal to one whole beat can sound synchronized at fast tempos. Check the result at 30 BPM before keeping it. Both devices receive the same waveform and sample timing; their individual delays still apply. Calibration volume bypasses normal boost and peaks are bounded separately.
 
 Standalone testing opens the chosen outputs directly and needs no virtual cable or microphone. During an existing shared/boosted stream, choose two of its active outputs: the test temporarily replaces the source sound and silences unselected outputs. Stopping resumes the original stream and gain without changing the program's output preference. Starting a test while a bridge is still opening is blocked until it is ready.
 
@@ -93,6 +97,6 @@ Output/input preferences use Windows' internal AudioPolicyConfig interface, with
 
 Run gain tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests`. Logs are stored at `%LOCALAPPDATA%\VolumeMixer\mixer.log`.
 
-Validated on this Windows 11 PC: device/program detection, routing/restoration, per-output delay, and calibration UI controls. Thirty-seven automated tests cover click timing and chunk continuity, level bounds, solo listening, independent output delays, standalone operation without capture, and resumption of shared audio with routing/gain preserved, alongside the existing mixer tests. Hardware smoke tests use unused virtual endpoints and zero-volume calibration so they do not play audible clicks on your devices. Microphone boost, audible distortion, and by-ear Bluetooth alignment still need listening tests on your chosen devices.
+Validated on this Windows 11 PC: device/program detection, routing/restoration, per-output delay, and calibration UI controls. Forty automated tests cover all six sounds, selectable beat spacing, live tempo changes, chunk continuity, level bounds, solo listening, independent output delays, standalone operation without capture, and resumption of shared audio with routing/gain preserved, alongside the existing mixer tests. Hardware smoke tests use unused virtual endpoints and zero-volume calibration so they do not play audible test sounds on your devices. Microphone boost, sound preferences, and by-ear Bluetooth alignment still need listening tests on your chosen devices.
 
 `smoke_test.py` runs those integration checks using its own silent session and unused virtual endpoints. Routing writes require running outside a restricted sandbox. If Voicemeeter's audio engine is required for your installed virtual endpoints, keep it running while using them.

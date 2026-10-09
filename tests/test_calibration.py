@@ -2,14 +2,14 @@ import time
 import unittest
 from unittest.mock import patch
 import numpy as np
-from calibration import CalibrationSignal, CalibrationSettings
+from calibration import CalibrationSignal, CalibrationSettings, PATTERNS
 from bridge import Bridge
 from test_bridge import Source, Target
 
 
 class SignalTests(unittest.TestCase):
     def test_clicks_are_short_identical_stereo_and_spaced(self):
-        data = CalibrationSignal().render(3 * 48000)
+        data = CalibrationSignal().render(3 * 48000, bpm=30)
         np.testing.assert_array_equal(data[:, 0], data[:, 1])
         self.assertEqual(np.count_nonzero(data[:24000]), 0)
         self.assertGreater(np.count_nonzero(data[24000:24240]), 0)
@@ -31,9 +31,42 @@ class SignalTests(unittest.TestCase):
         for outputs in ((), ('headset',), ('headset', 'headset')):
             with self.assertRaises(ValueError):
                 CalibrationSettings(outputs)
-        for options in ({'level': float('nan')}, {'level': 101}, {'pattern': 'unknown'}, {'audition': 'other'}):
+        for options in ({'level': float('nan')}, {'level': 101}, {'pattern': 'unknown'}, {'audition': 'other'}, {'bpm': 0}, {'bpm': 241}, {'bpm': float('nan')}):
             with self.assertRaises(ValueError):
                 CalibrationSettings(('a', 'b'), **options)
+
+    def test_every_sound_is_a_bounded_transient_with_identical_channels(self):
+        for pattern in PATTERNS.values():
+            with self.subTest(pattern=pattern):
+                generator = CalibrationSignal()
+                pulse = generator.pulses[pattern]
+                self.assertLess(len(pulse), 12000)
+                self.assertEqual(pulse[0], 0)
+                self.assertEqual(pulse[-1], 0)
+                data = generator.render(48000, pattern=pattern, level=100)
+                self.assertTrue(np.isfinite(data).all())
+                self.assertGreater(np.count_nonzero(data), 0)
+                self.assertLessEqual(float(np.max(np.abs(data))), .200001)
+                np.testing.assert_array_equal(data[:, 0], data[:, 1])
+
+    def test_faster_tempos_have_exact_beat_spacing_and_stream_continuity(self):
+        for bpm in (60, 90, 120, 180, 240):
+            with self.subTest(bpm=bpm):
+                generator = CalibrationSignal()
+                data = generator.render(144000, bpm=bpm)
+                period = round(48000 * 60 / bpm)
+                np.testing.assert_array_equal(data[24000:24240], data[24000 + period:24240 + period])
+                streamed = CalibrationSignal()
+                chunks = np.concatenate([streamed.render(960, bpm=bpm) for _ in range(150)])
+                np.testing.assert_array_equal(data, chunks)
+
+    def test_tempo_and_sound_change_live_without_invalid_samples(self):
+        generator = CalibrationSignal()
+        generator.render(48000, bpm=60)
+        data = generator.render(48000, pattern='bass', bpm=240)
+        np.testing.assert_array_equal(data[:24000], 0)
+        self.assertGreater(np.count_nonzero(data[24000:]), 0)
+        self.assertTrue(np.isfinite(data).all())
 
 
 class CalibrationPlaybackTests(unittest.TestCase):
