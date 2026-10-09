@@ -1,0 +1,3 @@
+pycaw==20260927
+soundcard==0.4.6
+numpy>=2.3,<3

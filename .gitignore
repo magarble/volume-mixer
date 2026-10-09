@@ -1,0 +1,13 @@
+.venv/
+.wheels/
+__pycache__/
+build/
+dist/
+dist-updated/
+dist-sync/
+dist-calibration/
+*.spec
+*.log
+.pytest_cache/
+.env
+.env.*
