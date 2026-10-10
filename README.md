@@ -1,10 +1,10 @@
-# Volume Mixer
+﻿# Volume Mixer
 
 Control each program's volume, choose its audio devices, and share its sound to multiple outputs from one Windows desktop app.
 
 **[Download for Windows x64](https://github.com/magarble/volume-mixer/releases/latest)** | [Report a bug](https://github.com/magarble/volume-mixer/issues/new?template=bug_report.yml) | [MIT licence](LICENSE)
 
-1. Download the `VolumeMixer-1.0.1-windows-x64.zip` asset from the latest release.
+1. Download the `VolumeMixer-1.0.2-windows-x64.zip` asset from the latest release.
 2. Extract the ZIP.
 3. Open the `VolumeMixer` folder and run `VolumeMixer.exe`.
 
@@ -35,7 +35,7 @@ Keep the whole folder together. Python and extra audio drivers are not required.
 
 Download the Windows x64 ZIP from [GitHub Releases](https://github.com/magarble/volume-mixer/releases), extract it, and open `VolumeMixer/VolumeMixer.exe`. Keep the entire folder together. Python and extra audio drivers are not required. The executable is unsigned, so Windows may show a publisher warning.
 
-Release packages include a `.sha256` file. To verify a download in PowerShell, run `Get-FileHash .\VolumeMixer-1.0.1-windows-x64.zip -Algorithm SHA256` and compare it with that file.
+Release packages include a `.sha256` file. To verify a download in PowerShell, run `Get-FileHash .\VolumeMixer-1.0.2-windows-x64.zip -Algorithm SHA256` and compare it with that file.
 
 Normal controls support Windows 10/11. Multi-output sharing requires Windows build 20348 or later, including Windows 11. See the compatibility notes below.
 
@@ -84,8 +84,8 @@ Each output has an independent playback worker with a bounded queue, so a slower
 
 Open **Output sync**, or use **Adjust output delays** on the currently shared program. Playing outputs appear first. Each output has:
 
-- A **0–1,000 ms** slider, updated live while sharing audio.
-- A millisecond entry, plus **−5/+5 ms** and **−1/+1 ms** buttons for coarse and fine adjustment.
+- A **0â€“1,000 ms** slider, updated live while sharing audio.
+- A millisecond entry, plus **âˆ’5/+5 ms** and **âˆ’1/+1 ms** buttons for coarse and fine adjustment.
 - Starting presets at **0, 50, 100, 150, 200, 250, 300, and 500 ms**.
 - A per-device **Reset** button and **Reset all output delays**.
 
@@ -125,7 +125,7 @@ Automated tests cover output drafts, duplicate rejection, primary-versus-copy pl
 
 `version.py` is the version source for the window title, Windows executable metadata, and archive name. Update it together with `CHANGELOG.md` and `RELEASE_NOTES.md` for each release.
 
-GitHub Actions tests and packages Windows builds on pushes to `main` and pull requests. Pushing a matching version tag (for example, `v1.0.1`) creates a **draft** release with the ZIP and checksum after the build passes. Run the local Windows smoke test and listen to a wired/Bluetooth device pair before publishing the draft. Hardware tests do not run on hosted CI.
+GitHub Actions tests and packages Windows builds on pushes to `main` and pull requests. Pushing a matching version tag (for example, `v1.0.2`) creates a **draft** release with the ZIP and checksum after the build passes. Run the local Windows smoke test and listen to a wired/Bluetooth device pair before publishing the draft. Hardware tests do not run on hosted CI.
 
 Report problems through [GitHub Issues](https://github.com/magarble/volume-mixer/issues), including the app version, Windows build (`winver`), affected programs/devices, and relevant log excerpts. Remove personal information before posting logs.
 
@@ -149,3 +149,4 @@ Logs are at `%LOCALAPPDATA%\VolumeMixer\mixer.log`. Include the app version, Win
 Bug reports, feature ideas, and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and audio hardware checks.
 
 Volume Mixer's own code is available under the [MIT licence](LICENSE), copyright 2026 magarble. Bundled dependencies keep their original licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the included `licenses/` folder. Release builds collect these notices automatically.
+

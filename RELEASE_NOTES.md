@@ -1,11 +1,11 @@
-# Volume Mixer 1.0.1
+# Volume Mixer 1.0.2
 
-This maintenance release adds licensing and documentation to the portable
-Windows mixer. Audio features are unchanged from 1.0.0.
+Adjust Output A and Output B independently with device-volume sliders directly
+on each application's card. Extra outputs get their own sliders too.
 
 ## Download and run
 
-1. Download `VolumeMixer-1.0.1-windows-x64.zip` below.
+1. Download `VolumeMixer-1.0.2-windows-x64.zip` below.
 2. Extract the ZIP to a folder you can write to.
 3. Open `VolumeMixer` and run `VolumeMixer.exe`. Keep the entire folder together.
 
@@ -14,11 +14,18 @@ Windows may display a publisher warning. A SHA-256 checksum accompanies the ZIP.
 
 ## Changes
 
-- MIT licence for Volume Mixer and original notices for bundled dependencies.
-- Licence collection and audited runtime checks in the release build.
-- Screenshots, troubleshooting, and clearer download instructions in the README.
-- Contribution guidance and a feature-request form on GitHub.
-- Documentation, screenshots, and licences included with the Windows download.
+- Individual device-volume sliders under Output A, B, and extra output rows.
+- Volume changes take effect immediately without applying outputs again.
+- Windows default controls the current default output device.
+- Missing devices display a message instead of an active slider.
+
+Device volume affects all audio on the selected Windows device. The program's
+volume slider remains separate. Refresh after changing the Windows default.
+
+## Validation
+
+All 51 automated tests passed. UI callback checks confirmed that adjusting A
+does not change B, with Windows-default and missing-device controls checked too.
 
 ## Requirements and limitations
 

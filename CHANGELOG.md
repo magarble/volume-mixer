@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Add individual device-volume sliders beneath Output A, B, and extra outputs.
+- Adjust selected Windows devices immediately, independently of each other.
+- Show unavailable controls for missing devices and clarify that device volume
+  affects all audio on that device.
+
 ## 1.0.1
 
 - Add the MIT licence and bundled third-party copyright and licence notices.
