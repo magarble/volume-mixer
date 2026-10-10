@@ -1,23 +1,24 @@
-# Volume Mixer 1.0.0
+# Volume Mixer 1.0.1
 
-A portable Windows desktop mixer with per-program volume, device routing,
-driver-free multi-output playback, and manual output alignment.
+This maintenance release adds licensing and documentation to the portable
+Windows mixer. Audio features are unchanged from 1.0.0.
 
 ## Download and run
 
-1. Download `VolumeMixer-1.0.0-windows-x64.zip` from this release.
+1. Download `VolumeMixer-1.0.1-windows-x64.zip` below.
 2. Extract the ZIP to a folder you can write to.
 3. Open `VolumeMixer` and run `VolumeMixer.exe`. Keep the entire folder together.
 
 Python and additional audio drivers are not required. The executable is unsigned;
 Windows may display a publisher warning. A SHA-256 checksum accompanies the ZIP.
 
-## Included
+## Changes
 
-- Friendly app names, volume and mute, and input/output preferences.
-- Multiple output rows for sharing one app to several devices.
-- Saved per-output delay settings and six alignment sounds with tempo controls.
-- Mouse-wheel scrolling without accidental dropdown or numeric changes.
+- MIT licence for Volume Mixer and original notices for bundled dependencies.
+- Licence collection and audited runtime checks in the release build.
+- Screenshots, troubleshooting, and clearer download instructions in the README.
+- Contribution guidance and a feature-request form on GitHub.
+- Documentation, screenshots, and licences included with the Windows download.
 
 ## Requirements and limitations
 
@@ -27,10 +28,3 @@ Windows may display a publisher warning. A SHA-256 checksum accompanies the ZIP.
 - Protected, exclusive, or offloaded audio may not be capturable.
 - Bluetooth synchronization is manual and can need readjustment.
 - Routing uses an internal Windows interface and may be affected by updates.
-
-## Validation before publishing
-
-Automated tests and packaging checks run in GitHub Actions. Run `smoke_test.py`
-on Windows to verify routing, UI startup, and silent capture to a second physical
-output. Listen to a wired/Bluetooth pair to verify alignment. Keep the release
-as a draft until these hardware checks pass.

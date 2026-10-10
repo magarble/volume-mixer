@@ -19,10 +19,14 @@ $version = & $python -c 'from version import __version__; print(__version__)'
 if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version.' }
 & $python release_metadata.py
 if ($LASTEXITCODE -ne 0) { throw 'Version metadata generation failed.' }
+& $python collect_licenses.py
+if ($LASTEXITCODE -ne 0) { throw 'Licence collection failed.' }
 $env:PYINSTALLER_CONFIG_DIR = Join-Path $PSScriptRoot 'build\cache'
 & $python -m PyInstaller --noconfirm --clean --windowed --onedir --workpath build/pyinstaller --distpath dist --name VolumeMixer --version-file build/windows-version.txt --collect-all soundcard app.py
 if ($LASTEXITCODE -ne 0) { throw 'Executable build failed.' }
-Copy-Item -LiteralPath README.md, CHANGELOG.md -Destination 'dist\VolumeMixer'
+Copy-Item -LiteralPath README.md, CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md -Destination 'dist\VolumeMixer'
+Copy-Item -LiteralPath licenses -Destination 'dist\VolumeMixer' -Recurse -Force
+Copy-Item -LiteralPath docs -Destination 'dist\VolumeMixer' -Recurse -Force
 New-Item -ItemType Directory -Path release -Force | Out-Null
 $archive = Join-Path $PSScriptRoot "release\VolumeMixer-$version-windows-x64.zip"
 Compress-Archive -Path 'dist\VolumeMixer' -DestinationPath $archive -Force

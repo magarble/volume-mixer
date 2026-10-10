@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest an improvement to Volume Mixer
+body:
+  - type: textarea
+    attributes:
+      label: What problem would this solve?
+      description: Describe your audio setup and what you are trying to do.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Suggested behaviour
+      description: Describe how the feature should work and any alternatives you have tried.
+    validations:
+      required: true

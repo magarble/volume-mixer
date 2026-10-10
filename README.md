@@ -1,6 +1,27 @@
 # Volume Mixer
 
-A Windows desktop mixer with friendly application names, per-program volume and mute, input/output preferences, simultaneous playback on multiple devices, microphone/speaker volume. Volume controls range from 0 to 100%.
+Control each program's volume, choose its audio devices, and share its sound to multiple outputs from one Windows desktop app.
+
+**[Download for Windows x64](https://github.com/magarble/volume-mixer/releases/latest)** | [Report a bug](https://github.com/magarble/volume-mixer/issues/new?template=bug_report.yml) | [MIT licence](LICENSE)
+
+1. Download the `VolumeMixer-1.0.1-windows-x64.zip` asset from the latest release.
+2. Extract the ZIP.
+3. Open the `VolumeMixer` folder and run `VolumeMixer.exe`.
+
+Keep the whole folder together. Python and extra audio drivers are not required.
+
+![Programs tab with per-app volume, routing, and an extra output](docs/programs.png)
+
+*Actual app interface with example programs and devices. Output selections shown are a draft, not active sharing.*
+
+<details>
+<summary>See Output sync and the alignment controls</summary>
+
+![Output sync tab with alignment sounds and per-device delays](docs/output-sync.png)
+
+*Example alignment setup: a wired headset with 150 ms added delay and a Bluetooth speaker with 0 ms.*
+
+</details>
 
 ## Features
 
@@ -14,11 +35,11 @@ A Windows desktop mixer with friendly application names, per-program volume and 
 
 Download the Windows x64 ZIP from [GitHub Releases](https://github.com/magarble/volume-mixer/releases), extract it, and open `VolumeMixer/VolumeMixer.exe`. Keep the entire folder together. Python and extra audio drivers are not required. The executable is unsigned, so Windows may show a publisher warning.
 
-Release packages include a `.sha256` file. To verify a download in PowerShell, run `Get-FileHash .\VolumeMixer-1.0.0-windows-x64.zip -Algorithm SHA256` and compare it with that file.
+Release packages include a `.sha256` file. To verify a download in PowerShell, run `Get-FileHash .\VolumeMixer-1.0.1-windows-x64.zip -Algorithm SHA256` and compare it with that file.
 
 Normal controls support Windows 10/11. Multi-output sharing requires Windows build 20348 or later, including Windows 11. See the compatibility notes below.
 
-For development, install Python 3.14 (x64, the release build environment) on Windows 10/11, then run:
+For development, install Python 3.14.0 (x64, the audited release build environment) on Windows 10/11, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\run.ps1
@@ -103,6 +124,27 @@ Automated tests cover output drafts, duplicate rejection, primary-versus-copy pl
 
 `version.py` is the version source for the window title, Windows executable metadata, and archive name. Update it together with `CHANGELOG.md` and `RELEASE_NOTES.md` for each release.
 
-GitHub Actions tests and packages Windows builds on pushes to `main` and pull requests. Pushing a matching version tag (for example, `v1.0.0`) creates a **draft** release with the ZIP and checksum after the build passes. Run the local Windows smoke test and listen to a wired/Bluetooth device pair before publishing the draft. Hardware tests do not run on hosted CI.
+GitHub Actions tests and packages Windows builds on pushes to `main` and pull requests. Pushing a matching version tag (for example, `v1.0.1`) creates a **draft** release with the ZIP and checksum after the build passes. Run the local Windows smoke test and listen to a wired/Bluetooth device pair before publishing the draft. Hardware tests do not run on hosted CI.
 
 Report problems through [GitHub Issues](https://github.com/magarble/volume-mixer/issues), including the app version, Windows build (`winver`), affected programs/devices, and relevant log excerpts. Remove personal information before posting logs.
+
+## Troubleshooting
+
+| Problem | What to try |
+| --- | --- |
+| A program is missing | Start playback, then click **Refresh devices & apps**. Refresh again after opening or closing programs. |
+| A device change has no effect | Restart playback or the affected program. Check whether it explicitly selects its own audio device. |
+| Sharing will not start | Use Windows build 20348 or later, select different connected outputs, and stop any existing sharing or alignment test. Check that no other app holds the output in exclusive mode. |
+| A copied output is silent | Check the program's mute/volume and the device's mute/volume. Protected, exclusive, and offloaded audio may not be capturable. |
+| Bluetooth and wired sound echo | Put the slower device on Output A. Add delay to the faster copied output in **Output sync**. Re-check at 30 BPM; wireless latency can change. |
+| The copy is late even at 0 ms | This device pair cannot be aligned through the current driver-free path: Output A cannot be delayed during sharing. |
+| A device disconnects | Reconnect it, refresh, and apply the outputs again. Sharing stops and restores the original route after a detected output failure. |
+| Windows shows a publisher warning | The portable executable is currently unsigned. Download from this repository's Releases page and verify the supplied checksum. |
+
+Logs are at `%LOCALAPPDATA%\VolumeMixer\mixer.log`. Include the app version, Windows build from `winver`, device setup, and a relevant log excerpt in a bug report. Remove private paths and other personal information before posting.
+
+## Contributing and licensing
+
+Bug reports, feature ideas, and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and audio hardware checks.
+
+Volume Mixer's own code is available under the [MIT licence](LICENSE), copyright 2026 magarble. Bundled dependencies keep their original licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the included `licenses/` folder. Release builds collect these notices automatically.

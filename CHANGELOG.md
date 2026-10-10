@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Add the MIT licence and bundled third-party copyright and licence notices.
+- Collect dependency notices during builds and check the audited native runtime.
+- Add real-interface screenshots with example data, quick download instructions,
+  troubleshooting, contribution guidance, and a feature-request form.
+- Include documentation and licence files in the portable Windows ZIP.
+
 ## 1.0.0
 
 First packaged release of Volume Mixer for Windows.

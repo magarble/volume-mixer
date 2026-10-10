@@ -1,0 +1,19 @@
+{
+  "runtime": {
+    "python": "3.14.0",
+    "openssl": "3.0.18",
+    "tcl": "8.6.15",
+    "expat": "2.7.3",
+    "zlib": "1.3.1.zlib-ng"
+  },
+  "sources": {
+    "openssl.txt": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0.18/LICENSE.txt",
+    "tcl.txt": "https://raw.githubusercontent.com/tcltk/tcl/core-8-6-15/license.terms",
+    "tk.txt": "https://raw.githubusercontent.com/tcltk/tk/core-8-6-15/license.terms",
+    "microsoft-sample.txt": "https://raw.githubusercontent.com/microsoft/Windows-classic-samples/main/LICENSE",
+    "zlib.txt": "https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE",
+    "zlib-ng.txt": "https://raw.githubusercontent.com/zlib-ng/zlib-ng/2.2.4/LICENSE.md",
+    "expat.txt": "https://raw.githubusercontent.com/libexpat/libexpat/R_2_7_3/expat/COPYING",
+    "python.txt": "https://github.com/python/cpython/tree/v3.14.0"
+  }
+}

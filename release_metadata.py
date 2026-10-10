@@ -18,6 +18,7 @@ if __name__ == '__main__':
                 StringStruct('FileDescription', 'Volume Mixer'),
                 StringStruct('FileVersion', __version__),
                 StringStruct('ProductVersion', __version__),
+                StringStruct('LegalCopyright', 'Copyright (c) 2026 magarble'),
                 StringStruct('OriginalFilename', 'VolumeMixer.exe'),
             ])]),
             VarFileInfo([VarStruct('Translation', [1033, 1200])]),
