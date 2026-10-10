@@ -50,10 +50,9 @@ class Target:
 
 
 class BridgeTests(unittest.TestCase):
-    def test_fan_out_gain_and_slow_output_independence(self):
+    def test_fan_out_preserves_samples_and_slow_output_independence(self):
         targets = {'headset': Target(2), 'bluetooth': Target(1, delay=.08)}
         bridge = Bridge()
-        bridge.gain = 200
         with patch('bridge.sc.get_microphone', return_value=Source()), patch('bridge.sc.get_speaker', side_effect=targets.__getitem__):
             bridge.start('cable', ('headset', 'bluetooth', 'headset'))
             try:
@@ -67,7 +66,7 @@ class BridgeTests(unittest.TestCase):
         for name, target in targets.items():
             self.assertTrue(target.blocks, name)
             self.assertEqual(target.blocks[0].shape[1], target.channels)
-            np.testing.assert_allclose(target.blocks[0], .4)
+            np.testing.assert_allclose(target.blocks[0], .2)
 
     def test_output_failure_never_reports_success(self):
         bridge = Bridge()

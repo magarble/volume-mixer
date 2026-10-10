@@ -4,7 +4,7 @@ import time
 import comtypes
 import soundcard as sc
 import numpy as np
-from dsp import amplify, output_channels
+from dsp import output_channels
 from delay import SampleDelay, validate_delay
 from calibration import CalibrationSettings, CalibrationSignal
 from dataclasses import dataclass
@@ -30,7 +30,6 @@ def offer_latest(buffer, data):
 
 class Bridge:
     def __init__(self):
-        self.gain = 100.0
         self.events = queue.Queue()
         self.stop_event = threading.Event()
         self.ready = threading.Event()
@@ -185,8 +184,6 @@ class Bridge:
                         signal_generation[0] = generation
                     test = generator.render(len(data), settings.pattern, settings.level, settings.bpm)
                     silence = np.zeros_like(test)
-                else:
-                    data = amplify(data, self.gain)
                 for output_id, buffer in zip(output_ids, buffers):
                     samples = (test if settings.audible(output_id) else silence) if settings else data
                     offer_latest(buffer, AudioPacket(samples, generation))

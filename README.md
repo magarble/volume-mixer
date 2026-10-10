@@ -1,10 +1,10 @@
 # Volume Mixer
 
-A Windows desktop mixer with friendly application names, per-program volume and mute, input/output preferences, simultaneous playback on multiple devices, microphone/speaker volume, and real audio gain up to 200%.
+A Windows desktop mixer with friendly application names, per-program volume and mute, input/output preferences, simultaneous playback on multiple devices, microphone/speaker volume. Volume controls range from 0 to 100%.
 
 ## Run
 
-Double-click `dist-inline/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
+Double-click `dist-no-boost/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
 
 For development, install Python 3.11 or newer on Windows 10/11, then run:
 
@@ -38,24 +38,22 @@ Refresh reads current Windows levels. Sliders do not automatically track changes
 
 All output configuration stays on the application's card. Extra rows can be removed; labels update automatically. Output selections and unfinished rows survive Refresh during the current app session. Changing a multi-output draft does not alter playback until you click Apply Outputs. Missing or duplicate devices produce an inline message, leaving a valid existing stream playing.
 
-While sharing, edit the rows and apply them to reconfigure that same app. Removing the final extra row immediately keeps Output A: normal 100% playback returns to direct routing, while active gain above 100% retains a single-output boost bridge. A single direct output changes immediately from its dropdown. Sharing still needs a dedicated virtual device and supports one application bridge at a time.
+While sharing, edit the rows and apply them to reconfigure that same app. Removing the final extra row stops sharing and routes directly to Output A. A single direct output changes immediately from its dropdown. Sharing still needs a dedicated virtual device and supports one application bridge at a time.
 
-Sharing starts at normal 100% gain. You can adjust gain in the **200% boost** tab while sharing. Its Outputs checkboxes also support multiple destinations for program boost.
-
-Each output has an independent playback worker with a bounded queue, so a slower output does not hold up the others or accumulate a long backlog. Per-output delay supports manual alignment of Bluetooth and wired devices. Different device clocks and changing wireless latency may require readjustment. A disconnected/failed output stops the bridge and restores the app's original route. One program or microphone bridge is supported at a time; all ordinary volume controls remain available.
+Each output has an independent playback worker with a bounded queue, so a slower output does not hold up the others or accumulate a long backlog. Per-output delay supports manual alignment of Bluetooth and wired devices. Different device clocks and changing wireless latency may require readjustment. A disconnected/failed output stops the bridge and restores the app's original route. One program bridge is supported at a time; all ordinary volume controls remain available.
 
 ## Output sync: adjust each device's delay
 
 Open **Output sync**, or use **Adjust output delays** on the currently shared program. Playing outputs appear first. Each output has:
 
-- A **0–1,000 ms** slider, updated live while sharing or boosting audio.
+- A **0–1,000 ms** slider, updated live while sharing audio.
 - A millisecond entry, plus **−5/+5 ms** and **−1/+1 ms** buttons for coarse and fine adjustment.
 - Starting presets at **0, 50, 100, 150, 200, 250, 300, and 500 ms**.
 - A per-device **Reset** button and **Reset all output delays**.
 
 Add delay to the faster device. For example, if the Bluetooth speaker sounds 150 ms later than the headset, set the headset to **150 ms** and leave Bluetooth at **0 ms**. Increase or decrease the headset delay until the echo disappears. The preset values are convenient starting points, not measured profiles for particular Bluetooth models or codecs.
 
-Delay is implemented with a bounded audio sample buffer at 48 kHz, independently for each output. Adjusting the slider changes the delay tap with a short crossfade; it may briefly blend two moments of the audio while you adjust. Initial delay introduces silence until the buffer fills. These controls apply to the mixer's shared/boosted playback path. Ordinary direct Windows routing uses the destination device's native timing.
+Delay is implemented with a bounded audio sample buffer at 48 kHz, independently for each output. Adjusting the slider changes the delay tap with a short crossfade; it may briefly blend two moments of the audio while you adjust. Initial delay introduces silence until the buffer fills. These controls apply to the mixer's shared playback path. Ordinary direct Windows routing uses the destination device's native timing.
 
 Settings are remembered by Windows endpoint ID at `%LOCALAPPDATA%\VolumeMixer\output-delays.json`. If a device is reinstalled and Windows assigns it a new endpoint ID, configure its delay again. Automatic latency measurement and long-term clock synchronization are not implemented.
 
@@ -73,34 +71,18 @@ Choose **Short click**, **Woodblock**, **Bright ding**, **Soft bell**, **Bass bu
 
 Tempo can be set from **30 to 240 BPM**, with presets at **30, 60, 90, 120, 150, 180, and 240 BPM**. At 90 BPM a hit repeats about every 667 ms; 120 BPM gives 500 ms and 240 BPM gives 250 ms. Sound, volume and tempo can all change while the test plays. Tempo changes use a brief settling interval before restarting the beat.
 
-Use a slower tempo when aligning large delays: an offset equal to one whole beat can sound synchronized at fast tempos. Check the result at 30 BPM before keeping it. Both devices receive the same waveform and sample timing; their individual delays still apply. Calibration volume bypasses normal boost and peaks are bounded separately.
+Use a slower tempo when aligning large delays: an offset equal to one whole beat can sound synchronized at fast tempos. Check the result at 30 BPM before keeping it. Both devices receive the same waveform and sample timing; their individual delays still apply. Calibration volume controls the test sound independently.
 
-Standalone testing opens the chosen outputs directly and needs no virtual cable or microphone. During an existing shared/boosted stream, choose two of its active outputs: the test temporarily replaces the source sound and silences unselected outputs. Stopping resumes the original stream and gain without changing the program's output preference. Starting a test while a bridge is still opening is blocked until it is ready.
+Standalone testing opens the chosen outputs directly and needs no virtual cable or microphone. During an existing shared stream, choose two of its active outputs: the test temporarily replaces the source sound and silences unselected outputs. Stopping resumes the original stream without changing the program's output preference. Starting a test while a bridge is still opening is blocked until it is ready.
 
 The default is our practical recommendation inferred from research on brief transient sounds, not a claim that one test sound is universally optimal. [Research on the precedence effect](https://pmc.ncbi.nlm.nih.gov/articles/PMC4032431/) uses brief broadband noise bursts to examine perception of delayed sounds; [click-rate experiments](https://pubmed.ncbi.nlm.nih.gov/2762101/) also show that repetition affects echo perception. Hearing one event can therefore still hide a small residual delay. This is approximate listening calibration; objective alignment needs a microphone and timing reference, as in [miniDSP's REW alignment procedure](https://www.minidsp.com/applications/rew/speaker-time-alignment).
-
-## 200% program boost
-
-Windows session volume stops at 100%. Boost uses WASAPI audio capture, sample gain, and playback instead of relabelling that slider.
-
-1. Install a virtual audio cable separately, such as [VB-CABLE](https://vb-audio.com/Cable/). The app does not install drivers or change the system default device. Leave cable endpoint volume at 100% and turn off Windows “Listen to this device” for that cable.
-2. Keep the cable dedicated to the program being boosted. Do not use it as your Windows default output. All audio sent to this cable passes through the same gain bridge; only one bridge is available in this version.
-3. In **200% boost**, choose **Program output boost**, the program, the cable's playback endpoint (usually **CABLE Input**), and check your physical output device(s).
-4. Click **Start boost**, restart the program's playback if necessary, and adjust the gain up to 200%.
-5. **Stop & restore output** restores its previous output preference. Normal closing also restores it. Force termination or a crash cannot perform restoration; use the Programs tab or Windows volume mixer to restore the program's output if that happens.
-
-200% means twice the audio sample amplitude, approximately +6.02 dB. It does not mean twice the perceived loudness. A hard clipper keeps samples between -1 and 1; overloaded peaks may distort. Device/session attenuation still affects the final loudness. The bridge adds latency and requires the mixer to remain running. Dedicated virtual cables would be needed for simultaneous independent program boosts.
-
-## 200% microphone boost
-
-Choose **Microphone input boost**, your physical microphone, and a virtual cable playback endpoint as destination. Start boost. Choose the cable's recording endpoint (usually **CABLE Output**) as input in the calling/recording program or its input preference in the Programs tab. Adjust gain up to 200%. This processes microphone samples before other programs capture them. Do not send the cable's own recording endpoint back into itself, and do not enable monitoring on that cable. Stop the bridge and restore the calling program's physical microphone when finished.
 
 ## Compatibility and validation
 
 Output/input preferences use Windows' internal AudioPolicyConfig interface, with fallbacks for current and older Windows builds. Windows updates may affect compatibility; ordinary volume controls remain usable if routing is unavailable. The interface layout was checked against [EarTrumpet's implementation](https://github.com/File-New-Project/EarTrumpet/tree/master/EarTrumpet/Interop/MMDeviceAPI). Audio endpoints and sessions use [Pycaw](https://andremiras.github.io/pycaw/); streaming uses [SoundCard](https://soundcard.readthedocs.io/en/latest/).
 
-Run gain tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests`. Logs are stored at `%LOCALAPPDATA%\VolumeMixer\mixer.log`.
+Run tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests`. Logs are stored at `%LOCALAPPDATA%\VolumeMixer\mixer.log`.
 
-Validated on this Windows 11 PC: device/program detection, routing/restoration, per-output delay, calibration controls, and inline output UI interactions. Forty-nine automated tests cover adding/removing output drafts, default-device resolution, duplicate rejection, reconfiguration with original routes and gain preserved, all six sounds, beat spacing, live tempo changes, channel mapping, and the existing mixer behavior. UI checks cover A/B/C rows, dropdown selection, refresh persistence, Apply Outputs, pending controls, last-extra removal, and absence of configuration popups. Hardware smoke tests use unused virtual endpoints and zero-volume calibration so they do not play audible test sounds on your devices. Microphone boost, sound preferences, and by-ear Bluetooth alignment still need listening tests on your chosen devices.
+Validated on this Windows 11 PC: device/program detection, routing/restoration, per-output delay, calibration controls, and inline output UI interactions. Automated tests cover adding/removing output drafts, default-device resolution, duplicate rejection, reconfiguration with original routes preserved, all six sounds, beat spacing, live tempo changes, channel mapping, and the existing mixer behavior. UI checks cover A/B/C rows, dropdown selection, refresh persistence, Apply Outputs, pending controls, last-extra removal, and absence of configuration popups. Hardware smoke tests use unused virtual endpoints and zero-volume calibration so they do not play audible test sounds on your devices. Sound preferences and by-ear Bluetooth alignment still need listening tests on your chosen devices.
 
 `smoke_test.py` runs those integration checks using its own silent session and unused virtual endpoints. Routing writes require running outside a restricted sandbox. If Voicemeeter's audio engine is required for your installed virtual endpoints, keep it running while using them.

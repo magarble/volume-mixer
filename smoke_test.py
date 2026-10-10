@@ -51,7 +51,6 @@ def main():
     virtual = [d for d in audio.outputs if 'voicemeeter' in d.FriendlyName.lower() and d.id not in used]
     if len(virtual) >= 3:
         bridge = Bridge()
-        bridge.gain = 200
         bridge.set_delay(virtual[1].id, 150)
         with sc.get_speaker(virtual[0].id).player(samplerate=48000, channels=2) as player:
             player.play(np.zeros((960, 2), dtype=np.float32))

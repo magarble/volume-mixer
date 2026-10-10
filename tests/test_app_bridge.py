@@ -8,11 +8,11 @@ from app import Mixer
 class BridgeLifecycleTests(unittest.TestCase):
     def make_mixer(self):
         mixer = object.__new__(Mixer)
-        mixer.pending_boost = None
-        mixer.boost_route = None
+        mixer.pending_share = None
+        mixer.shared_route = None
         mixer.bridge_outputs = ()
         mixer.bridge_name = ''
-        mixer.bridge = SimpleNamespace(thread=None, gain=175, events=queue.Queue(), start=Mock(), stop=Mock())
+        mixer.bridge = SimpleNamespace(thread=None, events=queue.Queue(), start=Mock(), stop=Mock())
         self.original = ('console-before', '', 'communications-before')
         self.source = SimpleNamespace(id='cable', FriendlyName='Dedicated Virtual Cable')
         self.headset = SimpleNamespace(id='headset', FriendlyName='Headset')
@@ -22,7 +22,6 @@ class BridgeLifecycleTests(unittest.TestCase):
             routing=SimpleNamespace(snapshot=Mock(return_value=self.original)),
             outputs=[self.source, self.headset, self.bluetooth],
             refresh=Mock(return_value=[]), route=Mock())
-        mixer.gain_value = Mock()
         mixer.status = Mock()
         mixer._refresh = Mock()
         mixer.after = Mock()
@@ -50,43 +49,41 @@ class BridgeLifecycleTests(unittest.TestCase):
         mixer.audio.route.assert_not_called()
         mixer.bridge.end_calibration.assert_called_once()
 
-    def test_alignment_preserves_active_route_and_gain(self):
+    def test_alignment_preserves_active_route(self):
         mixer = self.make_mixer()
         self.add_calibration_controls(mixer, standalone=False)
-        mixer.boost_route = (42, self.original)
+        mixer.shared_route = (42, self.original)
         mixer.bridge.thread = SimpleNamespace(is_alive=lambda: True)
         mixer.bridge_outputs = ('headset', 'bluetooth')
         mixer.start_alignment_test(('headset', 'bluetooth'), {'pattern': 'click', 'level': 20, 'audition': 'both'})
         mixer.stop_alignment_test()
-        self.assertEqual(mixer.boost_route, (42, self.original))
+        self.assertEqual(mixer.shared_route, (42, self.original))
         self.assertEqual(mixer.bridge_outputs, ('headset', 'bluetooth'))
-        self.assertEqual(mixer.bridge.gain, 175)
         mixer.audio.route.assert_not_called()
 
     def test_failed_bridge_must_restore_before_new_alignment(self):
         mixer = self.make_mixer()
         self.add_calibration_controls(mixer, standalone=True)
-        mixer.boost_route = (42, self.original)
+        mixer.shared_route = (42, self.original)
         mixer.action = lambda callback: callback()
         with self.assertRaises(RuntimeError):
             mixer.start_alignment_test(('headset', 'bluetooth'), {'pattern': 'click', 'level': 20, 'audition': 'both'})
         mixer.bridge.start_calibration.assert_not_called()
-        self.assertEqual(mixer.boost_route, (42, self.original))
+        self.assertEqual(mixer.shared_route, (42, self.original))
 
     @patch('app.AudioUtilities.GetSpeakers')
     def test_route_only_after_outputs_ready_then_restore_exact_preferences(self, default):
         mixer = self.make_mixer()
         default.return_value = self.headset
-        mixer.start_program_bridge(self.program, self.source, ('headset', 'bluetooth'), reset_gain=True)
+        mixer.start_program_bridge(self.program, self.source, ('headset', 'bluetooth'))
         mixer.audio.route.assert_not_called()
-        self.assertEqual(mixer.bridge.gain, 100)
         mixer.bridge.events.put(('ready', 'ready'))
         mixer.poll()
         mixer.audio.route.assert_called_once_with(42, 'cable')
         self.assertEqual(mixer.bridge_outputs, ('headset', 'bluetooth'))
-        mixer.stop_boost()
+        mixer.stop_sharing()
         self.assertEqual(mixer.audio.route.call_args.args, (42, self.original))
-        self.assertIsNone(mixer.boost_route)
+        self.assertIsNone(mixer.shared_route)
         self.assertEqual(mixer.bridge_outputs, ())
         mixer.bridge.stop.assert_called_once()
 
@@ -100,7 +97,7 @@ class BridgeLifecycleTests(unittest.TestCase):
         mixer.bridge.events.put(('error', 'Bluetooth disconnected'))
         mixer.poll()
         self.assertEqual(mixer.audio.route.call_args.args, (42, self.original))
-        self.assertIsNone(mixer.boost_route)
+        self.assertIsNone(mixer.shared_route)
         mixer.bridge.stop.assert_called_once()
 
     @patch('app.AudioUtilities.GetSpeakers')
@@ -111,5 +108,5 @@ class BridgeLifecycleTests(unittest.TestCase):
         with self.assertRaises(OSError):
             mixer.start_program_bridge(self.program, self.source, ('headset', 'bluetooth'))
         mixer.audio.route.assert_not_called()
-        self.assertIsNone(mixer.pending_boost)
+        self.assertIsNone(mixer.pending_share)
         self.assertEqual(mixer.bridge_outputs, ())

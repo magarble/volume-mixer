@@ -13,3 +13,4 @@ dist-inline/
 .pytest_cache/
 .env
 .env.*
+dist-no-boost/

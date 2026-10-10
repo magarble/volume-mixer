@@ -97,16 +97,15 @@ class CalibrationPlaybackTests(unittest.TestCase):
         self.assertFalse(bridge.calibrating)
         self.assertIsNone(bridge.thread)
 
-    def test_live_bridge_calibration_bypasses_boost_and_resumes_source(self):
+    def test_live_bridge_calibration_replaces_and_resumes_source(self):
         targets = {'a': Target(2), 'b': Target(2)}
         bridge = Bridge()
-        bridge.gain = 200
         with patch('bridge.sc.get_speaker', side_effect=targets.__getitem__), patch('bridge.sc.get_microphone', return_value=Source()):
             bridge.start('cable', ('a', 'b'))
             try:
                 self.assertTrue(bridge.ready.wait(2))
                 self.wait_for_blocks(targets, 3)
-                np.testing.assert_allclose(targets['a'].blocks[-1], .4)
+                np.testing.assert_allclose(targets['a'].blocks[-1], .2)
                 bridge.start_calibration(('a', 'b'), audition='a')
                 counts = {name: len(t.blocks) for name, t in targets.items()}
                 self.wait_for_blocks(targets, max(counts.values()) + 30)
@@ -119,8 +118,7 @@ class CalibrationPlaybackTests(unittest.TestCase):
                 self.assertTrue(bridge.thread.is_alive())
                 self.wait_for_blocks(targets, max(len(t.blocks) for t in targets.values()) + 3)
                 for target in targets.values():
-                    np.testing.assert_allclose(target.blocks[-1], .4)
-                self.assertEqual(bridge.gain, 200)
+                    np.testing.assert_allclose(target.blocks[-1], .2)
             finally:
                 bridge.stop()
 
