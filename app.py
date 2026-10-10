@@ -112,7 +112,12 @@ class Mixer(tk.Tk):
         return inner
 
     def scroll_page(self, event):
-        widget = self.winfo_containing(event.x_root, event.y_root)
+        try:
+            widget = self.winfo_containing(event.x_root, event.y_root)
+        except KeyError:
+            # Tk creates dropdown popups outside Python's widget registry.
+            # Leave scrolling an open menu to its own listbox bindings.
+            return
         if widget is None:
             return
         while widget is not None:
