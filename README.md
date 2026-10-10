@@ -71,7 +71,8 @@ Refresh reads current Windows levels. Sliders do not automatically track changes
 2. Click **Add Extra Output** to create **Output B** directly underneath. Pick your second device, such as a Bluetooth speaker. Add further rows for **Output C**, **D**, and so on.
 3. Choose Bluetooth as **Output A** and your headset as **Output B**. A plays the program's original audio; the mixer captures only that program and plays copies on B/C. No virtual audio device or extra driver is required.
 4. Click **Apply Outputs**. The app opens the extra outputs and application capture, then routes the program to A. Some programs need playback restarted to switch devices.
-5. **Stop sharing** restores the program's previous output preference. Closing the mixer also restores it.
+5. Adjust **Device volume** beneath each output row to change A, B, or any extra output independently. These sliders update the selected Windows device immediately, affecting all audio on that device. The program volume slider above the rows remains separate. Windows default controls the current default output; refresh after changing the Windows default.
+6. **Stop sharing** restores the program's previous output preference. Closing the mixer also restores it.
 
 All output configuration stays on the application's card. Extra rows can be removed; labels update automatically. Output selections and unfinished rows survive Refresh during the current app session. Changing a multi-output draft does not alter playback until you click Apply Outputs. Missing or duplicate devices produce an inline message, leaving a valid existing stream playing.
 

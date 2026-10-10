@@ -210,13 +210,33 @@ class Mixer(tk.Tk):
                               lambda: bool(self.shared_route and self.shared_route[0] == program.pid),
                               lambda: bool(self.pending_share and self.pending_share[0] == program.pid),
                               bool(self.audio.routing),
-                              lambda: self.bridge_outputs)
+                              lambda: self.bridge_outputs,
+                              self.output_volume_control)
             rows.pack(fill='x')
         else:
             row = ttk.Frame(card, style='Card.TFrame')
             row.pack(fill='x')
             self.route_choice(row, program, self.audio.outputs, 0, 'Output A')
             self.route_choice(row, program, self.audio.inputs, 1, 'Input')
+
+    def output_volume_control(self, parent, chosen):
+        row = ttk.Frame(parent, style='Card.TFrame')
+        row.pack(fill='x', padx=(73, 0), pady=(0, 12))
+        ttk.Label(row, text='Device volume', style='Card.TLabel').pack(side='left', padx=(0, 10))
+        device = next((d for d in self.audio.outputs if d.id == chosen), None)
+        try:
+            if chosen == '':
+                device = AudioUtilities.GetSpeakers()
+            if device is None:
+                ttk.Label(row, text='Choose a connected output to adjust its volume.',
+                          style='Card.TLabel', foreground=MUTED).pack(side='left')
+                return
+            endpoint = device.EndpointVolume
+            self.slider(row, endpoint.GetMasterVolumeLevelScalar() * 100,
+                        lambda value: endpoint.SetMasterVolumeLevelScalar(value / 100, None))
+        except Exception as exc:
+            ttk.Label(row, text=f'Volume unavailable: {exc}', style='Card.TLabel',
+                      foreground=MUTED).pack(side='left')
 
     def program_output_plan(self, program):
         if program.pid not in self.output_plans:

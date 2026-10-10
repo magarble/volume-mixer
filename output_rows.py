@@ -41,7 +41,8 @@ class OutputPlan:
 
 class OutputRows(ttk.Frame):
     def __init__(self, parent, plan, devices, render_input, on_change, on_remove,
-                 on_apply, on_stop, on_delay, active, pending, editable, playing):
+                 on_apply, on_stop, on_delay, active, pending, editable, playing,
+                 render_volume=None):
         super().__init__(parent, style='Card.TFrame')
         self.plan, self.devices = plan, list(devices)
         self.render_input = render_input
@@ -49,6 +50,7 @@ class OutputRows(ttk.Frame):
         self.on_apply, self.on_stop, self.on_delay = on_apply, on_stop, on_delay
         self.active, self.pending, self.editable = active, pending, editable
         self.playing = playing
+        self.render_volume = render_volume
         self.combos = []
         self.remove_buttons = []
         self.render()
@@ -89,6 +91,11 @@ class OutputRows(ttk.Frame):
                                     command=lambda number=index: self.remove(number))
                 remove.pack(side='left')
                 self.remove_buttons.append(remove)
+            if self.render_volume:
+                self.render_volume(self, chosen)
+        if self.render_volume:
+            ttk.Label(self, text='Device volume affects all audio on the selected device.',
+                      style='Card.TLabel', foreground='#9ba8bf', wraplength=850).pack(anchor='w', pady=(0, 8))
         actions = ttk.Frame(self, style='Card.TFrame')
         actions.pack(fill='x', pady=(4, 0))
         self.add_button = ttk.Button(actions, text='Add Extra Output', state='disabled' if disabled else 'normal', command=self.add)
