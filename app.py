@@ -12,6 +12,7 @@ from delay_controls import DelayControls
 from delay_preferences import DelayPreferences
 from calibration import PATTERNS
 from calibration_controls import CalibrationControls
+from output_rows import OutputPlan, OutputRows
 
 BG = "#10131c"
 CARD = "#1b2130"
@@ -36,6 +37,8 @@ class Mixer(tk.Tk):
         self.delay_variables = {}
         self.delay_save_job = None
         self.programs = []
+        self.output_plans = {}
+        self.active_source_id = ''
         self.boost_route = None
         self.pending_boost = None
         self.bridge_outputs = ()
@@ -117,6 +120,8 @@ class Mixer(tk.Tk):
 
     def _refresh(self):
         self.programs = self.audio.refresh()
+        live_pids = {p.pid for p in self.programs}
+        self.output_plans = {pid: plan for pid, plan in self.output_plans.items() if pid in live_pids}
         for frame in (self.apps_frame, self.devices_frame, self.sync_frame):
             for child in frame.winfo_children():
                 child.destroy()
@@ -171,22 +176,113 @@ class Mixer(tk.Tk):
         ttk.Label(card, text=f"{program.process_name} · PID {program.pid}", style="Card.TLabel",
                   foreground=MUTED).pack(anchor="w", pady=(4, 0))
         self.slider(card, program.volume, program.set_volume)
-        row = ttk.Frame(card, style="Card.TFrame")
-        row.pack(fill="x")
-        self.route_choice(row, program, self.audio.outputs, 0, "Output")
-        self.route_choice(row, program, self.audio.inputs, 1, "Input")
         if program.pid:
-            sharing = ttk.Frame(card, style="Card.TFrame")
-            sharing.pack(fill="x", pady=(12, 0))
-            ttk.Button(sharing, text="Play on multiple outputs…",
-                       command=lambda: self.multi_output_dialog(program)).pack(side="left")
+            plan = self.program_output_plan(program)
+            self.choose_inline_source(program, plan)
+            rows = OutputRows(card, plan, self.audio.outputs, [d for d in self.audio.outputs if self.is_cable(d)],
+                              lambda row: self.route_choice(row, program, self.audio.inputs, 1, 'Input'),
+                              lambda index: self.inline_output_changed(program, plan, index),
+                              lambda index: self.remove_inline_output(program, plan, index),
+                              lambda: self.apply_inline_outputs(program, plan),
+                              lambda: self.stop_inline_outputs(program, plan), self.show_output_sync,
+                              lambda: bool(self.boost_route and self.boost_route[0] == program.pid),
+                              lambda: bool(self.pending_boost and self.pending_boost[0] == program.pid),
+                              bool(self.audio.routing),
+                              lambda: self.bridge_outputs)
+            rows.pack(fill='x')
+        else:
+            row = ttk.Frame(card, style='Card.TFrame')
+            row.pack(fill='x')
+            self.route_choice(row, program, self.audio.outputs, 0, 'Output A')
+            self.route_choice(row, program, self.audio.inputs, 1, 'Input')
+
+    def program_output_plan(self, program):
+        if program.pid not in self.output_plans:
             if self.boost_route and self.boost_route[0] == program.pid:
-                ttk.Button(sharing, text="Stop & restore output",
-                           command=lambda: self.action(self.stop_and_refresh)).pack(side="left", padx=12)
-                ttk.Button(sharing, text='Adjust output delays', command=self.show_output_sync).pack(side='left')
-                names = {d.id: d.FriendlyName for d in self.audio.outputs}
-                ttk.Label(card, text="Playing on: " + ', '.join(names.get(i, i) for i in self.bridge_outputs),
-                          style="Card.TLabel", foreground=ACCENT, wraplength=850).pack(anchor="w", pady=(10, 0))
+                self.output_plans[program.pid] = OutputPlan(list(self.bridge_outputs), self.active_source_id)
+            else:
+                try:
+                    current = self.audio.routing.get(program.pid) if self.audio.routing else ''
+                except Exception:
+                    current = ''
+                self.output_plans[program.pid] = OutputPlan([current])
+        return self.output_plans[program.pid]
+
+    def choose_inline_source(self, program, plan):
+        if plan.source or len(plan.outputs) < 2:
+            return
+        try:
+            default = AudioUtilities.GetSpeakers()
+        except Exception:
+            default = None
+        used = {endpoint for p in self.programs if p.pid != program.pid for endpoint in p.active_endpoints}
+        targets = {default.id if endpoint == '' and default else endpoint for endpoint in plan.outputs}
+        candidate = next((d for d in self.audio.outputs if self.is_cable(d) and d.id not in used and d.id not in targets
+                          and (not default or d.id != default.id)), None)
+        if candidate:
+            plan.source = candidate.id
+
+    def inline_output_changed(self, program, plan, index):
+        self.choose_inline_source(program, plan)
+        if len(plan.outputs) == 1 and index == 0:
+            return self.apply_inline_outputs(program, plan)
+        return True
+
+    def remove_inline_output(self, program, plan, index):
+        before = list(plan.outputs)
+        plan.remove(index)
+        if len(plan.outputs) == 1 and not self.apply_inline_outputs(program, plan):
+            plan.outputs = before
+
+    def apply_inline_outputs(self, program, plan):
+        try:
+            if self.pending_boost:
+                raise RuntimeError('Wait for the current audio bridge to finish starting.')
+            own_bridge = bool(self.boost_route and self.boost_route[0] == program.pid)
+            keep_boost = own_bridge and self.bridge.gain > 100
+            if len(plan.outputs) == 1 and not keep_boost:
+                if plan.outputs[0] is None:
+                    raise ValueError('Choose a device for Output A.')
+                if plan.outputs[0] and plan.outputs[0] not in {d.id for d in self.audio.outputs}:
+                    raise ValueError('Output A disconnected. Choose a connected device.')
+                desired = plan.outputs[0]
+                if own_bridge:
+                    self.stop_boost()
+                self.audio.route(program.pid, desired)
+                plan.outputs = [desired]
+                plan.note = 'Output A applied.'
+            else:
+                default = AudioUtilities.GetSpeakers()
+                targets = plan.resolve(default.id if default else '')
+                source = next((d for d in self.audio.outputs if d.id == plan.source), None)
+                if source is None:
+                    raise ValueError('Choose an unused virtual audio device to share this app across outputs.')
+                # Validate before stopping the current stream so an invalid draft keeps playing.
+                self.validate_program_outputs(program, source, targets)
+                if own_bridge:
+                    self.stop_boost()
+                self.start_program_bridge(program, source, targets, reset_gain=not own_bridge)
+                plan.note = 'Starting playback on the selected outputs…'
+            self.status.set(plan.note)
+            return True
+        except Exception as exc:
+            logging.exception('Could not apply inline outputs')
+            plan.note = str(exc)
+            self.status.set(plan.note)
+            return False
+
+    def stop_inline_outputs(self, program, plan):
+        try:
+            current = self.boost_route or self.pending_boost
+            if not current or current[0] != program.pid:
+                plan.note = 'This app is not currently sharing audio.'
+                return
+            self.stop_boost()
+            plan.note = 'Sharing stopped; original output restored. Apply Outputs to share again.'
+            self.status.set(plan.note)
+        except Exception as exc:
+            plan.note = str(exc)
+            self.status.set(plan.note)
 
     def route_choice(self, row, program, devices, flow, title):
         ttk.Label(row, text=title, style="Card.TLabel").pack(side="left", padx=(0, 8))
@@ -365,7 +461,7 @@ class Mixer(tk.Tk):
         buttons = ttk.Frame(frame)
         buttons.pack(anchor="w")
         ttk.Button(buttons, text="Start boost", command=lambda: self.action(self.start_boost)).pack(side="left", padx=(0, 12))
-        ttk.Button(buttons, text="Stop & restore output", command=lambda: self.action(self.stop_boost)).pack(side="left")
+        ttk.Button(buttons, text="Stop & restore output", command=lambda: self.action(self.stop_and_refresh)).pack(side="left")
         ttk.Button(frame, text='Adjust output delays', command=self.show_output_sync).pack(anchor='w', pady=(12, 0))
         ttk.Label(frame, text="Use Output sync to delay faster devices and line them up with Bluetooth. One program or microphone bridge at a time. 200% doubles sample amplitude (+6 dB); overloaded peaks may distort. Keep this app open while sharing audio.",
                   foreground=MUTED, wraplength=880).pack(anchor="w", pady=14)
@@ -381,60 +477,7 @@ class Mixer(tk.Tk):
     def is_cable(device):
         return any(token in device.FriendlyName.lower() for token in ("cable", "voicemeeter", "virtual"))
 
-    def multi_output_dialog(self, program):
-        dialog = tk.Toplevel(self)
-        dialog.title(f"Outputs for {program.name}")
-        dialog.configure(bg=BG)
-        dialog.geometry("720x620")
-        dialog.minsize(620, 580)
-        dialog.transient(self)
-        frame = ttk.Frame(dialog, padding=22)
-        frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text=program.name, font=("Segoe UI", 20, "bold")).pack(anchor="w")
-        ttk.Label(frame, text=f"{program.process_name} · PID {program.pid}", foreground=MUTED).pack(anchor="w", pady=(4, 12))
-        ttk.Label(frame, text="Select your headset, Bluetooth speaker, or any other outputs to play them together. A dedicated virtual audio device carries this app's sound to the selected outputs.",
-                  foreground=MUTED, wraplength=650).pack(anchor="w", pady=(0, 10))
-        outputs = list(self.audio.outputs)
-        choices = DeviceChoices(frame, height=230)
-        choices.pack(fill="both", expand=True)
-        selected = self.bridge_outputs if self.boost_route and self.boost_route[0] == program.pid else ()
-        choices.set_devices(outputs, selected)
-        cables = [d for d in outputs if self.is_cable(d)]
-        source = self.field(frame, "Dedicated virtual audio device")
-        source['values'] = [d.FriendlyName for d in cables]
-        used = {i for p in self.programs if p.pid != program.pid for i in p.active_endpoints}
-        default = AudioUtilities.GetSpeakers()
-        available = [i for i, d in enumerate(cables) if d.id not in used and (not default or d.id != default.id)]
-        if available:
-            source.current(available[0])
-        ttk.Label(frame, text="Use Output sync to delay faster outputs until they line up with Bluetooth. Use 100% gain for normal playback; adjust gain in the 200% boost tab if needed.",
-                  foreground=MUTED, wraplength=650).pack(anchor="w", pady=12)
-        buttons = ttk.Frame(frame)
-        buttons.pack(fill="x")
-        def start():
-            try:
-                targets = choices.selected_ids()
-                if len(targets) < 2:
-                    raise ValueError("Select at least two output devices.")
-                if source.current() < 0:
-                    raise ValueError("Choose an unused virtual audio device. Install a virtual cable if none is available.")
-                self.start_program_bridge(program, cables[source.current()], targets, reset_gain=True)
-                dialog.destroy()
-            except Exception as exc:
-                messagebox.showerror("Could not start multiple outputs", str(exc), parent=dialog)
-        ttk.Button(buttons, text="Start multiple outputs", command=start).pack(side="left")
-        ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side="right")
-        def adjust_delays():
-            self.show_output_sync()
-            dialog.destroy()
-        ttk.Button(buttons, text='Adjust delays', command=adjust_delays).pack(side='left', padx=10)
-        if self.boost_route and self.boost_route[0] == program.pid:
-            ttk.Button(buttons, text="Stop & restore output",
-                       command=lambda: self.action(self.stop_and_refresh)).pack(side="left", padx=10)
-
-    def start_program_bridge(self, program, source, targets, reset_gain=False):
-        if self.pending_boost or self.boost_route or (self.bridge.thread and self.bridge.thread.is_alive()):
-            raise RuntimeError("Stop the current audio bridge before starting another.")
+    def validate_program_outputs(self, program, source, targets):
         if not self.is_cable(source):
             raise ValueError("Choose a virtual audio device as source to keep this program isolated.")
         if not self.audio.routing:
@@ -450,6 +493,13 @@ class Mixer(tk.Tk):
         connected = {d.id for d in self.audio.outputs}
         if not targets or any(target not in connected for target in targets) or source.id not in connected:
             raise ValueError("A selected device disconnected. Refresh and choose connected devices.")
+        if len(set(targets)) != len(targets):
+            raise ValueError('Choose different devices for each output.')
+
+    def start_program_bridge(self, program, source, targets, reset_gain=False):
+        if self.pending_boost or self.boost_route or (self.bridge.thread and self.bridge.thread.is_alive()):
+            raise RuntimeError("Stop the current audio bridge before starting another.")
+        self.validate_program_outputs(program, source, targets)
         old_route = self.audio.routing.snapshot(program.pid)
         if reset_gain:
             self.bridge.gain = 100
@@ -463,6 +513,13 @@ class Mixer(tk.Tk):
             self.pending_boost = None
             self.bridge_outputs = ()
             raise
+        self.active_source_id = source.id
+        plans = self.__dict__.get('output_plans')
+        if plans is not None:
+            plan = plans.setdefault(program.pid, OutputPlan())
+            plan.outputs = list(targets)
+            plan.source = source.id
+            plan.note = 'Starting playback on the selected outputs…'
         self.status.set(f"Starting audio for {program.name} on {len(targets)} output device(s)…")
 
     def start_boost(self):
@@ -491,6 +548,7 @@ class Mixer(tk.Tk):
         self.status.set("Starting the audio bridge…")
 
     def stop_boost(self):
+        prior = self.boost_route or self.pending_boost
         self.pending_boost = None
         # Restore the program first so stopping the bridge does not strand its audio.
         if self.boost_route:
@@ -499,6 +557,15 @@ class Mixer(tk.Tk):
             self.boost_route = None
         self.bridge.stop()
         self.bridge_outputs = ()
+        self.active_source_id = ''
+        plans = self.__dict__.get('output_plans', {})
+        if prior and prior[0] in plans:
+            plan = plans[prior[0]]
+            if len(plan.outputs) == 1:
+                plan.outputs = [prior[1][1]]
+                plan.note = 'Sharing stopped; original output restored.'
+            else:
+                plan.note = 'Sharing stopped; original output restored. Apply Outputs to share again.'
         controls = self.__dict__.get('calibration_controls')
         if controls:
             controls.set_running(False)
@@ -519,6 +586,9 @@ class Mixer(tk.Tk):
                     try:
                         self.audio.route(pid, cable)
                         self.boost_route = (pid, old_route)
+                        plans = self.__dict__.get('output_plans', {})
+                        if pid in plans:
+                            plans[pid].note = 'Playing on the selected outputs.'
                         text = f"{self.bridge_name} is playing on {len(self.bridge_outputs)} output device(s). Restart playback if the app hasn't switched yet."
                         self._refresh()
                     except Exception as exc:
@@ -530,12 +600,19 @@ class Mixer(tk.Tk):
                             continue
                         text = str(exc)
                 if kind == "error":
+                    failed = self.pending_boost or self.boost_route
                     self.pending_boost = None
                     try:
                         self.stop_boost()
-                        self._refresh()
                     except Exception as exc:
                         text += " Restore/stop failed: " + str(exc)
+                    plans = self.__dict__.get('output_plans', {})
+                    if failed and failed[0] in plans:
+                        plans[failed[0]].note = text
+                    try:
+                        self._refresh()
+                    except Exception as exc:
+                        text += ' Refresh failed: ' + str(exc)
                     calibration_status = self.__dict__.get('calibration_status')
                     if calibration_status:
                         calibration_status.set(text)

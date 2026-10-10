@@ -6,6 +6,6 @@ if (-not (Test-Path -LiteralPath '.venv\Scripts\python.exe')) {
 }
 & '.\.venv\Scripts\python.exe' -m pip install -r requirements.txt pyinstaller
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
-& '.\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean --windowed --onedir --distpath dist-tempo --name VolumeMixer --collect-all soundcard app.py
+& '.\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean --windowed --onedir --distpath dist-inline --name VolumeMixer --collect-all soundcard app.py
 if ($LASTEXITCODE -ne 0) { throw 'Executable build failed.' }
-Write-Host 'Built dist-tempo\VolumeMixer\VolumeMixer.exe. Keep the entire VolumeMixer folder together.'
+Write-Host 'Built dist-inline\VolumeMixer\VolumeMixer.exe. Keep the entire VolumeMixer folder together.'

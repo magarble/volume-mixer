@@ -4,7 +4,7 @@ A Windows desktop mixer with friendly application names, per-program volume and 
 
 ## Run
 
-Double-click `dist-tempo/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
+Double-click `dist-inline/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
 
 For development, install Python 3.11 or newer on Windows 10/11, then run:
 
@@ -30,11 +30,15 @@ Refresh reads current Windows levels. Sliders do not automatically track changes
 
 ## Play one app on multiple outputs
 
-1. On the application's card, click **Play on multiple outputs…**.
-2. Check two or more outputs, for example your headset and Bluetooth speaker.
-3. Choose a dedicated virtual audio playback device. The dialog preselects an unused one if available. Install a virtual cable if needed; keep the source separate from your selected outputs and your Windows default output.
-4. Click **Start multiple outputs**. The app first opens all selected outputs, then routes the program to the virtual device. Some programs need playback restarted to switch devices.
-5. The card lists the devices playing the app. Use **Stop & restore output** to return it to its previous output preference. Closing the mixer also restores that preference.
+1. On the application's card, choose your first device in **Output A**. The input selector stays beside it.
+2. Click **Add Extra Output** to create **Output B** directly underneath. Pick your second device, such as a Bluetooth speaker. Add further rows for **Output C**, **D**, and so on.
+3. The inline **Virtual audio device** selector preselects an unused dedicated playback device when available. Install a virtual cable if needed; keep the source separate from your chosen outputs and your Windows default output.
+4. Click **Apply Outputs**. The app first opens all selected outputs, then routes the program to the virtual device. Some programs need playback restarted to switch devices.
+5. The card lists the devices playing the app. **Stop sharing** restores its previous output preference. Closing the mixer also restores that preference.
+
+All output configuration stays on the application's card. Extra rows can be removed; labels update automatically. Output selections and unfinished rows survive Refresh during the current app session. Changing a multi-output draft does not alter playback until you click Apply Outputs. Missing or duplicate devices produce an inline message, leaving a valid existing stream playing.
+
+While sharing, edit the rows and apply them to reconfigure that same app. Removing the final extra row immediately keeps Output A: normal 100% playback returns to direct routing, while active gain above 100% retains a single-output boost bridge. A single direct output changes immediately from its dropdown. Sharing still needs a dedicated virtual device and supports one application bridge at a time.
 
 Sharing starts at normal 100% gain. You can adjust gain in the **200% boost** tab while sharing. Its Outputs checkboxes also support multiple destinations for program boost.
 
@@ -97,6 +101,6 @@ Output/input preferences use Windows' internal AudioPolicyConfig interface, with
 
 Run gain tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests`. Logs are stored at `%LOCALAPPDATA%\VolumeMixer\mixer.log`.
 
-Validated on this Windows 11 PC: device/program detection, routing/restoration, per-output delay, and calibration UI controls. Forty automated tests cover all six sounds, selectable beat spacing, live tempo changes, chunk continuity, level bounds, solo listening, independent output delays, standalone operation without capture, and resumption of shared audio with routing/gain preserved, alongside the existing mixer tests. Hardware smoke tests use unused virtual endpoints and zero-volume calibration so they do not play audible test sounds on your devices. Microphone boost, sound preferences, and by-ear Bluetooth alignment still need listening tests on your chosen devices.
+Validated on this Windows 11 PC: device/program detection, routing/restoration, per-output delay, calibration controls, and inline output UI interactions. Forty-nine automated tests cover adding/removing output drafts, default-device resolution, duplicate rejection, reconfiguration with original routes and gain preserved, all six sounds, beat spacing, live tempo changes, channel mapping, and the existing mixer behavior. UI checks cover A/B/C rows, dropdown selection, refresh persistence, Apply Outputs, pending controls, last-extra removal, and absence of configuration popups. Hardware smoke tests use unused virtual endpoints and zero-volume calibration so they do not play audible test sounds on your devices. Microphone boost, sound preferences, and by-ear Bluetooth alignment still need listening tests on your chosen devices.
 
 `smoke_test.py` runs those integration checks using its own silent session and unused virtual endpoints. Routing writes require running outside a restricted sandbox. If Voicemeeter's audio engine is required for your installed virtual endpoints, keep it running while using them.
