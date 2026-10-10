@@ -32,27 +32,27 @@ class InlineRoutingTests(unittest.TestCase):
         self.original = helper.original
         self.mixer.output_plans = {}
         self.mixer.programs = []
-        self.mixer.active_source_id = ''
+        self.mixer.primary_output_id = ''
         self.mixer.bridge.stop.side_effect = lambda: setattr(self.mixer.bridge, 'thread', None)
 
     @patch('app.AudioUtilities.GetSpeakers')
     def test_apply_inline_pair_starts_bridge_without_routing_until_ready(self, default):
         default.return_value = self.headset
-        plan = OutputPlan(['', 'bluetooth'], 'cable')
+        plan = OutputPlan(['', 'bluetooth'])
         self.mixer.output_plans[42] = plan
         self.assertTrue(self.mixer.apply_inline_outputs(self.program, plan))
-        self.mixer.bridge.start.assert_called_once_with('cable', ('headset', 'bluetooth'))
+        self.mixer.bridge.start_process.assert_called_once_with(42, ('bluetooth',))
         self.mixer.audio.route.assert_not_called()
         self.assertEqual(plan.outputs, ['headset', 'bluetooth'])
         self.mixer.bridge.events.put(('ready', 'ready'))
         self.mixer.poll()
-        self.mixer.audio.route.assert_called_once_with(42, 'cable')
+        self.mixer.audio.route.assert_called_once_with(42, 'headset')
 
     @patch('app.AudioUtilities.GetSpeakers')
     def test_invalid_draft_keeps_existing_playback(self, default):
         default.return_value = self.headset
         self.mixer.shared_route = (42, self.original)
-        plan = OutputPlan(['', 'headset'], 'cable')
+        plan = OutputPlan(['', 'headset'])
         with self.assertLogs(level='ERROR'):
             self.assertFalse(self.mixer.apply_inline_outputs(self.program, plan))
         self.mixer.bridge.stop.assert_not_called()
@@ -65,15 +65,15 @@ class InlineRoutingTests(unittest.TestCase):
         self.mixer.audio.outputs.append(SimpleNamespace(id='speakers', FriendlyName='Speakers'))
         self.mixer.shared_route = (42, self.original)
         self.mixer.bridge.thread = SimpleNamespace(is_alive=lambda: True)
-        plan = OutputPlan(['headset', 'speakers'], 'cable')
+        plan = OutputPlan(['headset', 'speakers'])
         self.mixer.output_plans[42] = plan
         self.assertTrue(self.mixer.apply_inline_outputs(self.program, plan))
         self.mixer.audio.route.assert_called_once_with(42, self.original)
-        self.mixer.bridge.start.assert_called_once_with('cable', ('headset', 'speakers'))
+        self.mixer.bridge.start_process.assert_called_once_with(42, ('speakers',))
 
     def test_removing_last_extra_keeps_remaining_output_a(self):
         self.mixer.shared_route = (42, self.original)
-        plan = OutputPlan(['headset', 'bluetooth'], 'cable')
+        plan = OutputPlan(['headset', 'bluetooth'])
         self.mixer.output_plans[42] = plan
         self.mixer.remove_inline_output(self.program, plan, 1)
         self.assertEqual(plan.outputs, ['headset'])
@@ -83,7 +83,7 @@ class InlineRoutingTests(unittest.TestCase):
 
     def test_stop_single_output_bridge_shows_restored_route(self):
         self.mixer.shared_route = (42, self.original)
-        plan = OutputPlan(['headset'], 'cable')
+        plan = OutputPlan(['headset'])
         self.mixer.output_plans[42] = plan
         self.mixer.stop_inline_outputs(self.program, plan)
         self.assertEqual(plan.outputs, [''])

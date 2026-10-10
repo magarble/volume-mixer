@@ -16,7 +16,6 @@ def output_letter(index):
 @dataclass
 class OutputPlan:
     outputs: list = field(default_factory=lambda: [''])
-    source: str = ''
     note: str = ''
 
     def add(self):
@@ -41,10 +40,10 @@ class OutputPlan:
 
 
 class OutputRows(ttk.Frame):
-    def __init__(self, parent, plan, devices, sources, render_input, on_change, on_remove,
+    def __init__(self, parent, plan, devices, render_input, on_change, on_remove,
                  on_apply, on_stop, on_delay, active, pending, editable, playing):
         super().__init__(parent, style='Card.TFrame')
-        self.plan, self.devices, self.sources = plan, list(devices), list(sources)
+        self.plan, self.devices = plan, list(devices)
         self.render_input = render_input
         self.on_change, self.on_remove = on_change, on_remove
         self.on_apply, self.on_stop, self.on_delay = on_apply, on_stop, on_delay
@@ -101,22 +100,8 @@ class OutputRows(ttk.Frame):
             ttk.Button(actions, text='Stop sharing', command=self.stop).pack(side='left', padx=(0, 10))
             ttk.Button(actions, text='Adjust output delays', command=self.on_delay).pack(side='left')
         if len(self.plan.outputs) > 1:
-            source_row = ttk.Frame(self, style='Card.TFrame')
-            source_row.pack(fill='x', pady=(12, 0))
-            ttk.Label(source_row, text='Virtual audio device', style='Card.TLabel').pack(side='left', padx=(0, 10))
-            self.source_combo = ttk.Combobox(source_row, values=[d.FriendlyName for d in self.sources],
-                                            state='disabled' if disabled else 'readonly', width=45)
-            self.source_combo.pack(side='left')
-            ids = [d.id for d in self.sources]
-            if self.plan.source in ids:
-                self.source_combo.current(ids.index(self.plan.source))
-            else:
-                self.source_combo.set('Choose an unused virtual device' if ids else 'Install a virtual audio cable to enable sharing')
-            def source_selected(event):
-                self.plan.source = ids[self.source_combo.current()]
-                self.plan.note = 'Changes are not applied yet. Apply Outputs to update playback.'
-                self.render()
-            self.source_combo.bind('<<ComboboxSelected>>', source_selected)
+            ttk.Label(self, text='Output A plays directly. Use Bluetooth here; delay the faster copies on B/C in Output sync.',
+                      style='Card.TLabel', foreground='#9ba8bf', wraplength=850).pack(anchor='w', pady=(10, 0))
         if self.plan.note:
             ttk.Label(self, text=self.plan.note, style='Card.TLabel', foreground='#9ba8bf', wraplength=850).pack(anchor='w', pady=(10, 0))
         if self.active():

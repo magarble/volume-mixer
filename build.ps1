@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath '.venv\Scripts\python.exe')) {
 }
 & '.\.venv\Scripts\python.exe' -m pip install -r requirements.txt pyinstaller
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
-$env:PYINSTALLER_CONFIG_DIR = Join-Path $PSScriptRoot 'build\cache-no-boost'
-& '.\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean --windowed --onedir --workpath build/no-boost --distpath dist-no-boost --name VolumeMixer --collect-all soundcard app.py
+$env:PYINSTALLER_CONFIG_DIR = Join-Path $PSScriptRoot 'build\cache-driver-free'
+& '.\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean --windowed --onedir --workpath build/driver-free --distpath dist-driver-free --name VolumeMixer --collect-all soundcard app.py
 if ($LASTEXITCODE -ne 0) { throw 'Executable build failed.' }
-Write-Host 'Built dist-no-boost\VolumeMixer\VolumeMixer.exe. Keep the entire VolumeMixer folder together.'
+Write-Host 'Built dist-driver-free\VolumeMixer\VolumeMixer.exe. Keep the entire VolumeMixer folder together.'

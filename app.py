@@ -1,12 +1,15 @@
 import logging
 import os
 import queue
+import time
+import psutil
 import tkinter as tk
 from tkinter import ttk, messagebox
 from pathlib import Path
 from audio import Audio
 from bridge import Bridge
 from pycaw.pycaw import AudioUtilities
+from pycaw.constants import DEVICE_STATE
 from delay_controls import DelayControls
 from delay_preferences import DelayPreferences
 from calibration import PATTERNS
@@ -37,7 +40,8 @@ class Mixer(tk.Tk):
         self.delay_save_job = None
         self.programs = []
         self.output_plans = {}
-        self.active_source_id = ''
+        self.primary_output_id = ''
+        self.share_check_at = 0
         self.shared_route = None
         self.pending_share = None
         self.bridge_outputs = ()
@@ -168,8 +172,7 @@ class Mixer(tk.Tk):
         self.slider(card, program.volume, program.set_volume)
         if program.pid:
             plan = self.program_output_plan(program)
-            self.choose_inline_source(program, plan)
-            rows = OutputRows(card, plan, self.audio.outputs, [d for d in self.audio.outputs if self.is_cable(d)],
+            rows = OutputRows(card, plan, self.audio.outputs,
                               lambda row: self.route_choice(row, program, self.audio.inputs, 1, 'Input'),
                               lambda index: self.inline_output_changed(program, plan, index),
                               lambda index: self.remove_inline_output(program, plan, index),
@@ -189,7 +192,7 @@ class Mixer(tk.Tk):
     def program_output_plan(self, program):
         if program.pid not in self.output_plans:
             if self.shared_route and self.shared_route[0] == program.pid:
-                self.output_plans[program.pid] = OutputPlan(list(self.bridge_outputs), self.active_source_id)
+                self.output_plans[program.pid] = OutputPlan(list(self.bridge_outputs))
             else:
                 try:
                     current = self.audio.routing.get(program.pid) if self.audio.routing else ''
@@ -198,22 +201,7 @@ class Mixer(tk.Tk):
                 self.output_plans[program.pid] = OutputPlan([current])
         return self.output_plans[program.pid]
 
-    def choose_inline_source(self, program, plan):
-        if plan.source or len(plan.outputs) < 2:
-            return
-        try:
-            default = AudioUtilities.GetSpeakers()
-        except Exception:
-            default = None
-        used = {endpoint for p in self.programs if p.pid != program.pid for endpoint in p.active_endpoints}
-        targets = {default.id if endpoint == '' and default else endpoint for endpoint in plan.outputs}
-        candidate = next((d for d in self.audio.outputs if self.is_cable(d) and d.id not in used and d.id not in targets
-                          and (not default or d.id != default.id)), None)
-        if candidate:
-            plan.source = candidate.id
-
     def inline_output_changed(self, program, plan, index):
-        self.choose_inline_source(program, plan)
         if len(plan.outputs) == 1 and index == 0:
             return self.apply_inline_outputs(program, plan)
         return True
@@ -243,14 +231,11 @@ class Mixer(tk.Tk):
             else:
                 default = AudioUtilities.GetSpeakers()
                 targets = plan.resolve(default.id if default else '')
-                source = next((d for d in self.audio.outputs if d.id == plan.source), None)
-                if source is None:
-                    raise ValueError('Choose an unused virtual audio device to share this app across outputs.')
-                # Validate before stopping the current stream so an invalid draft keeps playing.
-                self.validate_program_outputs(program, source, targets)
+                # Reject invalid drafts before stopping the existing stream.
+                self.validate_program_outputs(program, targets)
                 if own_bridge:
                     self.stop_sharing()
-                self.start_program_bridge(program, source, targets)
+                self.start_program_bridge(program, targets)
                 plan.note = 'Starting playback on the selected outputs…'
             self.status.set(plan.note)
             return True
@@ -342,11 +327,11 @@ class Mixer(tk.Tk):
     def build_output_sync(self):
         frame = self.sync_frame
         ttk.Label(frame, text='Line up your speakers and headset', font=('Segoe UI', 20, 'bold')).pack(anchor='w', padx=14, pady=(0, 12))
-        ttk.Label(frame, text='Add delay to the faster output until you hear both together. Changes apply live during shared playback and are remembered per device.\n\nExample: if Bluetooth is about 150 ms late, add 150 ms to your headset and leave Bluetooth at 0 ms. Presets are starting points; the best value depends on your devices.',
+        ttk.Label(frame, text='Add delay to the faster output until you hear both together. Output A plays directly and cannot be delayed. Put Bluetooth on A and adjust the faster copies on B/C. Settings are remembered per device.\n\nExample: if Bluetooth is about 150 ms late, add 150 ms to your headset and leave Bluetooth at 0 ms. Presets are starting points; the best value depends on your devices.',
                   foreground=MUTED, wraplength=880, justify='left').pack(anchor='w', padx=14, pady=(0, 12))
         running = self.bridge.thread and self.bridge.thread.is_alive()
-        candidates = [d for d in self.audio.outputs if not running or d.id in self.bridge.outputs]
-        candidates.sort(key=lambda d: (self.is_cable(d), d.FriendlyName.lower()))
+        candidates = [d for d in self.audio.outputs if not running or d.id in self.bridge_outputs]
+        candidates.sort(key=lambda d: d.FriendlyName.lower())
         available = {d.id for d in candidates}
         selected = tuple(i for i in self.calibration_selection if i in available)
         if len(selected) != 2:
@@ -382,8 +367,11 @@ class Mixer(tk.Tk):
             if device.id in self.bridge_outputs:
                 ttk.Label(heading, text='Playing now' if self.bridge.ready.is_set() and not self.bridge.error else 'Selected output',
                           style='Card.TLabel', foreground=ACCENT).pack(side='right')
-            controls = DelayControls(card, self.delay_variable(device.id), self.status.set)
-            controls.pack(fill='x', pady=(6, 0))
+            if (self.shared_route or self.pending_share) and device.id == self.primary_output_id:
+                ttk.Label(card, text='Output A ? direct playback ? no added delay', style='Card.TLabel', foreground=MUTED).pack(anchor='w', pady=(8, 0))
+            else:
+                controls = DelayControls(card, self.delay_variable(device.id), self.status.set)
+                controls.pack(fill='x', pady=(6, 0))
 
     def select_alignment_outputs(self, outputs):
         self.calibration_selection = tuple(outputs)
@@ -393,8 +381,8 @@ class Mixer(tk.Tk):
         def start():
             if self.pending_share:
                 raise RuntimeError('Wait for the current bridge to finish starting.')
-            if self.shared_route and not (self.bridge.thread and self.bridge.thread.is_alive()):
-                raise RuntimeError('Stop and restore the failed audio bridge before starting a new test.')
+            if self.shared_route:
+                raise RuntimeError('Stop sharing and pause the program before playing the alignment test. Then apply outputs again and fine-tune B/C while listening to the program.')
             connected = {d.id for d in self.audio.outputs}
             if len(outputs) != 2 or any(i not in connected for i in outputs):
                 raise ValueError('Choose two connected output devices.')
@@ -428,51 +416,41 @@ class Mixer(tk.Tk):
         for device_id in ids:
             self.delay_variable(device_id).set(0)
 
-    @staticmethod
-    def is_cable(device):
-        return any(token in device.FriendlyName.lower() for token in ("cable", "voicemeeter", "virtual"))
-
-    def validate_program_outputs(self, program, source, targets):
-        if not self.is_cable(source):
-            raise ValueError("Choose a virtual audio device as source to keep this program isolated.")
+    def validate_program_outputs(self, program, targets):
+        from process_capture import ensure_supported
+        ensure_supported()
+        if not program.pid:
+            raise ValueError('Choose an application to share.')
         if not self.audio.routing:
-            raise RuntimeError("Per-program routing is unavailable on this Windows version.")
-        if source.id in targets:
-            raise ValueError("The dedicated virtual device cannot also be a selected output.")
-        default = AudioUtilities.GetSpeakers()
-        if default and default.id == source.id:
-            raise ValueError("The virtual device is your Windows default output. Choose a dedicated device so other apps aren't shared too.")
-        live_programs = self.audio.refresh()
-        if any(p.pid != program.pid and source.id in p.active_endpoints for p in live_programs):
-            raise ValueError("Another program is playing through this virtual device. Choose an unused device.")
+            raise RuntimeError('Per-program routing is unavailable on this Windows version.')
         connected = {d.id for d in self.audio.outputs}
-        if not targets or any(target not in connected for target in targets) or source.id not in connected:
-            raise ValueError("A selected device disconnected. Refresh and choose connected devices.")
+        if len(targets) < 2 or any(target not in connected for target in targets):
+            raise ValueError('Choose at least two connected output devices.')
         if len(set(targets)) != len(targets):
             raise ValueError('Choose different devices for each output.')
 
-    def start_program_bridge(self, program, source, targets):
+    def start_program_bridge(self, program, targets):
         if self.pending_share or self.shared_route or (self.bridge.thread and self.bridge.thread.is_alive()):
-            raise RuntimeError("Stop the current audio bridge before starting another.")
-        self.validate_program_outputs(program, source, targets)
+            raise RuntimeError('Stop the current audio bridge before starting another.')
+        self.validate_program_outputs(program, targets)
         old_route = self.audio.routing.snapshot(program.pid)
-        self.pending_share = (program.pid, old_route, source.id)
+        self.pending_share = (program.pid, old_route, targets[0])
         self.bridge_outputs = tuple(targets)
         self.bridge_name = program.name
         try:
-            self.bridge.start(source.id, targets)
+            # Output A is native playback: never write a second copy to it.
+            self.bridge.start_process(program.pid, targets[1:])
         except Exception:
             self.pending_share = None
             self.bridge_outputs = ()
             raise
-        self.active_source_id = source.id
+        self.primary_output_id = targets[0]
         plans = self.__dict__.get('output_plans')
         if plans is not None:
             plan = plans.setdefault(program.pid, OutputPlan())
             plan.outputs = list(targets)
-            plan.source = source.id
-            plan.note = 'Starting playback on the selected outputs…'
-        self.status.set(f"Starting audio for {program.name} on {len(targets)} output device(s)…")
+            plan.note = 'Starting playback on the selected outputs?'
+        self.status.set(f'Starting audio for {program.name} on {len(targets)} output devices?')
 
     def stop_sharing(self):
         prior = self.shared_route or self.pending_share
@@ -484,7 +462,7 @@ class Mixer(tk.Tk):
             self.shared_route = None
         self.bridge.stop()
         self.bridge_outputs = ()
-        self.active_source_id = ''
+        self.primary_output_id = ''
         plans = self.__dict__.get('output_plans', {})
         if prior and prior[0] in plans:
             plan = plans[prior[0]]
@@ -503,15 +481,32 @@ class Mixer(tk.Tk):
         self.stop_sharing()
         self._refresh()
 
+    def check_shared_playback(self):
+        if not self.shared_route:
+            return
+        now = time.monotonic()
+        if now < self.__dict__.get('share_check_at', 0):
+            return
+        self.share_check_at = now + 2
+        pid = self.shared_route[0]
+        outputs = AudioUtilities.GetAllDevices(data_flow=0, device_state=DEVICE_STATE.ACTIVE.value)
+        connected = {device.id for device in outputs}
+        if not psutil.pid_exists(pid) or self.primary_output_id not in connected:
+            self.bridge.events.put(('error', 'Sharing stopped: the application closed or Output A disconnected.'))
+
     def poll(self):
+        try:
+            self.check_shared_playback()
+        except Exception:
+            logging.exception('Could not check the primary output')
         try:
             while True:
                 kind, text = self.bridge.events.get_nowait()
                 if kind == "ready" and self.pending_share:
-                    pid, old_route, cable = self.pending_share
+                    pid, old_route, primary = self.pending_share
                     self.pending_share = None
                     try:
-                        self.audio.route(pid, cable)
+                        self.audio.route(pid, primary)
                         self.shared_route = (pid, old_route)
                         plans = self.__dict__.get('output_plans', {})
                         if pid in plans:

@@ -46,49 +46,40 @@ def main():
     audio.routing.close()
     print("UI smoke test passed.")
 
-    # Only use unused virtual playback endpoints. Never capture a live microphone.
-    used = {endpoint for program in programs for endpoint in program.active_endpoints}
-    virtual = [d for d in audio.outputs if 'voicemeeter' in d.FriendlyName.lower() and d.id not in used]
-    if len(virtual) >= 3:
+    # Capture a separate silent helper process so playback cannot feed back.
+    import subprocess
+    import sys
+    helper_code = """
+import comtypes
+import soundcard as sc
+import numpy as np
+with sc.get_speaker(__import__('sys').argv[1]).player(samplerate=48000, channels=2, blocksize=960) as player:
+    print('ready', flush=True)
+    for _ in range(1500):
+        player.play(np.zeros((960, 2), dtype=np.float32))
+"""
+    physical = [d for d in audio.outputs if not any(word in d.FriendlyName.lower() for word in ('virtual', 'broadcast', 'cable'))]
+    if len(physical) >= 2:
+        helper = subprocess.Popen([sys.executable, '-c', helper_code, physical[0].id], stdout=subprocess.PIPE, text=True)
         bridge = Bridge()
-        bridge.set_delay(virtual[1].id, 150)
-        with sc.get_speaker(virtual[0].id).player(samplerate=48000, channels=2) as player:
-            player.play(np.zeros((960, 2), dtype=np.float32))
-            try:
-                bridge.start(virtual[0].id, [virtual[1].id, virtual[2].id])
-                assert bridge.ready.wait(timeout=5), 'Bridge startup timed out'
-                if bridge.error:
-                    raise RuntimeError(bridge.error)
-                for index in range(10):
-                    player.play(np.zeros((960, 2), dtype=np.float32))
-                    if index == 5:
-                        bridge.set_delay(virtual[1].id, 100)
-                assert bridge.get_delay(virtual[1].id) == 100
-                assert bridge.get_delay(virtual[2].id) == 0
-                time.sleep(.2)
-                if bridge.error:
-                    raise RuntimeError(bridge.error)
-            finally:
-                bridge.stop()
-        print('Two-output silent streaming at 200%, independent delays, live delay adjustment, and shutdown passed.')
-        test = Bridge()
-        test.set_delay(virtual[1].id, 150)
         try:
-            test.start_calibration((virtual[1].id, virtual[2].id), level=0)
-            assert test.ready.wait(timeout=5), 'Calibration startup timed out'
-            if test.error:
-                raise RuntimeError(test.error)
-            time.sleep(.6)
-            for pattern, bpm in (('ding', 120), ('bell', 180), ('bass', 240), ('woodblock', 90), ('burst', 60)):
-                test.update_calibration((virtual[1].id, virtual[2].id), pattern=pattern, level=0, audition='a', bpm=bpm)
-                time.sleep(.1)
-            if test.error:
-                raise RuntimeError(test.error)
+            assert helper.stdout.readline().strip() == 'ready'
+            bridge.set_delay(physical[1].id, 150)
+            bridge.start_process(helper.pid, (physical[1].id,))
+            assert bridge.ready.wait(15), 'Process capture startup timed out'
+            assert not bridge.error, bridge.error
+            time.sleep(.3)
+            bridge.set_delay(physical[1].id, 100)
+            time.sleep(.2)
+            assert not bridge.error, bridge.error
+            assert bridge.get_delay(physical[1].id) == 100
         finally:
-            test.end_calibration()
-        print('Standalone calibration sounds, live tempo switching, solo and shutdown passed at zero test volume.')
+            bridge.stop()
+            helper.terminate()
+            helper.wait(timeout=5)
+        print('Driver-free process capture, physical extra output, live delay adjustment, and shutdown passed with a silent source.')
     else:
-        print('Bridge hardware smoke test skipped: three unused virtual endpoints required.')
+        print('Driver-free playback smoke skipped: two connected physical outputs required.')
 
 
 if __name__ == '__main__':

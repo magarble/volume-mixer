@@ -14,3 +14,4 @@ dist-inline/
 .env
 .env.*
 dist-no-boost/
+dist-driver-free/

@@ -1,10 +1,12 @@
 import queue
+import os
 import threading
 import time
 import comtypes
 import soundcard as sc
 import numpy as np
 from dsp import output_channels
+from process_capture import ProcessCapture
 from delay import SampleDelay, validate_delay
 from calibration import CalibrationSettings, CalibrationSignal
 from dataclasses import dataclass
@@ -99,7 +101,12 @@ class Bridge:
         with self._delay_lock:
             return self._delays.get(output_id, 0)
 
-    def start(self, source_id, output_ids, loopback=True):
+    def start_process(self, pid, output_ids):
+        if not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
+            raise ValueError('Choose another running application; capturing the mixer itself would cause feedback.')
+        self.start(pid, output_ids, process=True)
+
+    def start(self, source_id, output_ids, loopback=True, process=False):
         if (self.thread and self.thread.is_alive()) or any(w.is_alive() for w in self._writers):
             raise RuntimeError("Stop the existing audio bridge first.")
         outputs = (output_ids,) if isinstance(output_ids, str) else tuple(dict.fromkeys(output_ids))
@@ -117,7 +124,7 @@ class Bridge:
         self.ready.clear()
         self.error = None
         self._writers = []
-        self.thread = threading.Thread(target=self._run, args=(source_id, outputs, loopback), daemon=True)
+        self.thread = threading.Thread(target=self._run, args=(source_id, outputs, loopback, process), daemon=True)
         self.thread.start()
 
     def _fail(self, message):
@@ -154,10 +161,10 @@ class Bridge:
             started.set()
             comtypes.CoUninitialize()
 
-    def _run(self, source_id, output_ids, loopback):
+    def _run(self, source_id, output_ids, loopback, process):
         comtypes.CoInitialize()
         try:
-            source = sc.get_microphone(source_id, include_loopback=loopback) if source_id is not None else None
+            source = None if source_id is None or process else sc.get_microphone(source_id, include_loopback=loopback)
             buffers, startup = [], []
             for output_id in output_ids:
                 buffer, started = queue.Queue(maxsize=6), threading.Event()
@@ -187,7 +194,7 @@ class Bridge:
                 for output_id, buffer in zip(output_ids, buffers):
                     samples = (test if settings.audible(output_id) else silence) if settings else data
                     offer_latest(buffer, AudioPacket(samples, generation))
-            if source is None:
+            if source_id is None:
                 self.ready.set()
                 self.events.put(("ready", 'Calibration outputs are ready.'))
                 deadline = time.monotonic()
@@ -200,7 +207,8 @@ class Bridge:
                     self.stop_event.wait(timeout=max(0, deadline - time.monotonic()))
                 return
             # Preserve stereo/multichannel WASAPI capture; writers map their channels.
-            with source.recorder(samplerate=48000, channels=source.channels, blocksize=960) as recorder:
+            recording = ProcessCapture(source_id) if process else source.recorder(samplerate=48000, channels=source.channels, blocksize=960)
+            with recording as recorder:
                 self.ready.set()
                 self.events.put(("ready", f"Audio bridge is playing on {len(output_ids)} output device(s)."))
                 while not self.stop_event.is_set():

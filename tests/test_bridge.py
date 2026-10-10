@@ -1,4 +1,5 @@
 import queue
+import os
 import threading
 import time
 import unittest
@@ -67,6 +68,40 @@ class BridgeTests(unittest.TestCase):
             self.assertTrue(target.blocks, name)
             self.assertEqual(target.blocks[0].shape[1], target.channels)
             np.testing.assert_allclose(target.blocks[0], .2)
+
+    def test_process_capture_only_writes_to_extra_outputs(self):
+        targets = {'headset': Target(2), 'speakers': Target(1)}
+        bridge = Bridge()
+        with patch('bridge.ProcessCapture', return_value=Recorder()) as capture, patch('bridge.sc.get_microphone') as endpoint_capture, patch('bridge.sc.get_speaker', side_effect=targets.__getitem__):
+            bridge.start_process(42, ('headset', 'speakers'))
+            try:
+                self.assertTrue(bridge.ready.wait(2))
+                self.assertIsNone(bridge.error)
+                time.sleep(.1)
+            finally:
+                bridge.stop()
+        capture.assert_called_once_with(42)
+        endpoint_capture.assert_not_called()
+        for target in targets.values():
+            self.assertTrue(target.blocks)
+            np.testing.assert_allclose(target.blocks[0], .2)
+
+    def test_process_capture_rejects_mixer_feedback(self):
+        bridge = Bridge()
+        for pid in (0, -1, os.getpid()):
+            with self.assertRaises(ValueError):
+                bridge.start_process(pid, ('headset',))
+        self.assertIsNone(bridge.thread)
+
+    def test_process_activation_failure_never_reports_ready(self):
+        bridge = Bridge()
+        with patch('bridge.ProcessCapture', side_effect=OSError('activation failed')), patch('bridge.sc.get_speaker', return_value=Target(2)):
+            bridge.start_process(42, ('headset',))
+            self.assertTrue(bridge.ready.wait(2))
+            bridge.stop()
+        self.assertIn('activation failed', bridge.error)
+        self.assertEqual(bridge.events.get_nowait()[0], 'error')
+        self.assertTrue(bridge.events.empty())
 
     def test_output_failure_never_reports_success(self):
         bridge = Bridge()

@@ -10,9 +10,10 @@ class BridgeLifecycleTests(unittest.TestCase):
         mixer = object.__new__(Mixer)
         mixer.pending_share = None
         mixer.shared_route = None
+        mixer.primary_output_id = ''
         mixer.bridge_outputs = ()
         mixer.bridge_name = ''
-        mixer.bridge = SimpleNamespace(thread=None, events=queue.Queue(), start=Mock(), stop=Mock())
+        mixer.bridge = SimpleNamespace(thread=None, events=queue.Queue(), start=Mock(), start_process=Mock(), stop=Mock())
         self.original = ('console-before', '', 'communications-before')
         self.source = SimpleNamespace(id='cable', FriendlyName='Dedicated Virtual Cable')
         self.headset = SimpleNamespace(id='headset', FriendlyName='Headset')
@@ -25,6 +26,7 @@ class BridgeLifecycleTests(unittest.TestCase):
         mixer.status = Mock()
         mixer._refresh = Mock()
         mixer.after = Mock()
+        mixer.check_shared_playback = Mock()
         return mixer
 
     def add_calibration_controls(self, mixer, standalone):
@@ -49,14 +51,16 @@ class BridgeLifecycleTests(unittest.TestCase):
         mixer.audio.route.assert_not_called()
         mixer.bridge.end_calibration.assert_called_once()
 
-    def test_alignment_preserves_active_route(self):
+    def test_live_alignment_rejected_without_changing_active_route(self):
         mixer = self.make_mixer()
         self.add_calibration_controls(mixer, standalone=False)
         mixer.shared_route = (42, self.original)
         mixer.bridge.thread = SimpleNamespace(is_alive=lambda: True)
         mixer.bridge_outputs = ('headset', 'bluetooth')
-        mixer.start_alignment_test(('headset', 'bluetooth'), {'pattern': 'click', 'level': 20, 'audition': 'both'})
-        mixer.stop_alignment_test()
+        mixer.action = lambda callback: callback()
+        with self.assertRaisesRegex(RuntimeError, 'Stop sharing'):
+            mixer.start_alignment_test(('headset', 'bluetooth'), {'pattern': 'click', 'level': 20, 'audition': 'both'})
+        mixer.bridge.start_calibration.assert_not_called()
         self.assertEqual(mixer.shared_route, (42, self.original))
         self.assertEqual(mixer.bridge_outputs, ('headset', 'bluetooth'))
         mixer.audio.route.assert_not_called()
@@ -75,12 +79,13 @@ class BridgeLifecycleTests(unittest.TestCase):
     def test_route_only_after_outputs_ready_then_restore_exact_preferences(self, default):
         mixer = self.make_mixer()
         default.return_value = self.headset
-        mixer.start_program_bridge(self.program, self.source, ('headset', 'bluetooth'))
+        mixer.start_program_bridge(self.program, ('bluetooth', 'headset'))
+        mixer.bridge.start_process.assert_called_once_with(42, ('headset',))
         mixer.audio.route.assert_not_called()
         mixer.bridge.events.put(('ready', 'ready'))
         mixer.poll()
-        mixer.audio.route.assert_called_once_with(42, 'cable')
-        self.assertEqual(mixer.bridge_outputs, ('headset', 'bluetooth'))
+        mixer.audio.route.assert_called_once_with(42, 'bluetooth')
+        self.assertEqual(mixer.bridge_outputs, ('bluetooth', 'headset'))
         mixer.stop_sharing()
         self.assertEqual(mixer.audio.route.call_args.args, (42, self.original))
         self.assertIsNone(mixer.shared_route)
@@ -91,7 +96,7 @@ class BridgeLifecycleTests(unittest.TestCase):
     def test_output_disconnect_restores_program_route(self, default):
         mixer = self.make_mixer()
         default.return_value = self.headset
-        mixer.start_program_bridge(self.program, self.source, ('headset', 'bluetooth'))
+        mixer.start_program_bridge(self.program, ('bluetooth', 'headset'))
         mixer.bridge.events.put(('ready', 'ready'))
         mixer.poll()
         mixer.bridge.events.put(('error', 'Bluetooth disconnected'))
@@ -104,9 +109,9 @@ class BridgeLifecycleTests(unittest.TestCase):
     def test_start_failure_keeps_original_routing(self, default):
         mixer = self.make_mixer()
         default.return_value = self.headset
-        mixer.bridge.start.side_effect = OSError('Device unavailable')
+        mixer.bridge.start_process.side_effect = OSError('Device unavailable')
         with self.assertRaises(OSError):
-            mixer.start_program_bridge(self.program, self.source, ('headset', 'bluetooth'))
+            mixer.start_program_bridge(self.program, ('bluetooth', 'headset'))
         mixer.audio.route.assert_not_called()
         self.assertIsNone(mixer.pending_share)
         self.assertEqual(mixer.bridge_outputs, ())
