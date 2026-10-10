@@ -15,6 +15,7 @@ from delay_preferences import DelayPreferences
 from calibration import PATTERNS
 from calibration_controls import CalibrationControls
 from output_rows import OutputPlan, OutputRows
+from version import __version__
 
 BG = "#10131c"
 CARD = "#1b2130"
@@ -26,7 +27,7 @@ ACCENT = "#79b8ff"
 class Mixer(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Volume Mixer")
+        self.title(f"Volume Mixer {__version__}")
         self.geometry("1060x780")
         self.minsize(860, 620)
         self.configure(bg=BG)

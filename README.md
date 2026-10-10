@@ -2,11 +2,23 @@
 
 A Windows desktop mixer with friendly application names, per-program volume and mute, input/output preferences, simultaneous playback on multiple devices, microphone/speaker volume. Volume controls range from 0 to 100%.
 
-## Run
+## Features
 
-Double-click `dist-scroll-fix/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
+- Per-program volume and mute, with friendly application names.
+- Input/output preferences and device volume controls.
+- Share one app to several outputs without a virtual audio driver.
+- Saved delays for copied outputs and test sounds to align devices by ear.
+- Dark interface with inline output rows and predictable mouse-wheel scrolling.
 
-For development, install Python 3.11 or newer on Windows 10/11, then run:
+## Download and run
+
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/magarble/volume-mixer/releases), extract it, and open `VolumeMixer/VolumeMixer.exe`. Keep the entire folder together. Python and extra audio drivers are not required. The executable is unsigned, so Windows may show a publisher warning.
+
+Release packages include a `.sha256` file. To verify a download in PowerShell, run `Get-FileHash .\VolumeMixer-1.0.0-windows-x64.zip -Algorithm SHA256` and compare it with that file.
+
+Normal controls support Windows 10/11. Multi-output sharing requires Windows build 20348 or later, including Windows 11. See the compatibility notes below.
+
+For development, install Python 3.14 (x64, the release build environment) on Windows 10/11, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\run.ps1
@@ -17,6 +29,8 @@ Build the desktop executable:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
+
+The build runs the automated tests and produces `dist/VolumeMixer/VolumeMixer.exe`, a versioned ZIP, and its SHA-256 checksum in `release/`. Use `build.ps1 -SkipInstall` to reuse an already installed build environment.
 
 ## Normal mixing
 
@@ -79,8 +93,16 @@ Standalone testing opens the chosen outputs directly and needs no driver or micr
 
 ## Compatibility and validation
 
-Output/input preferences use Windows' internal AudioPolicyConfig interface, with fallbacks for current and older Windows builds. Windows updates may affect compatibility; ordinary volume controls remain usable if routing is unavailable. The interface layout was checked against [EarTrumpet's implementation](https://github.com/File-New-Project/EarTrumpet/tree/master/EarTrumpet/Interop/MMDeviceAPI). Audio endpoints and sessions use [Pycaw](https://andremiras.github.io/pycaw/); per-application capture uses the system COM APIs demonstrated by [Microsoft?s application loopback sample](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/), and playback uses [SoundCard](https://soundcard.readthedocs.io/en/latest/).
+Output/input preferences use Windows' internal AudioPolicyConfig interface, with fallbacks for current and older Windows builds. Windows updates may affect compatibility; ordinary volume controls remain usable if routing is unavailable. The interface layout was checked against [EarTrumpet's implementation](https://github.com/File-New-Project/EarTrumpet/tree/master/EarTrumpet/Interop/MMDeviceAPI). Audio endpoints and sessions use [Pycaw](https://andremiras.github.io/pycaw/); per-application capture uses the system COM APIs demonstrated by [Microsoft's application loopback sample](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/), and playback uses [SoundCard](https://soundcard.readthedocs.io/en/latest/).
 
 Run tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests`. Logs are stored at `%LOCALAPPDATA%\VolumeMixer\mixer.log`.
 
 Automated tests cover output drafts, duplicate rejection, primary-versus-copy playback, process-capture startup failures, route restoration, independent delays, and calibration sounds. Run `python smoke_test.py` for Windows UI/routing checks and silent process capture between two physical outputs. Bluetooth synchronization needs listening tests with the speaker connected; varying wireless latency and device clocks may require readjustment. DRM-protected audio and exclusive/offloaded playback may not be capturable.
+
+## Release maintenance
+
+`version.py` is the version source for the window title, Windows executable metadata, and archive name. Update it together with `CHANGELOG.md` and `RELEASE_NOTES.md` for each release.
+
+GitHub Actions tests and packages Windows builds on pushes to `main` and pull requests. Pushing a matching version tag (for example, `v1.0.0`) creates a **draft** release with the ZIP and checksum after the build passes. Run the local Windows smoke test and listen to a wired/Bluetooth device pair before publishing the draft. Hardware tests do not run on hosted CI.
+
+Report problems through [GitHub Issues](https://github.com/magarble/volume-mixer/issues), including the app version, Windows build (`winver`), affected programs/devices, and relevant log excerpts. Remove personal information before posting logs.

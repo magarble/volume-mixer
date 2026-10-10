@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a problem with Volume Mixer
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Include the steps to reproduce and what you expected.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: App version and Windows build
+      placeholder: Volume Mixer 1.0.0; Windows build from winver
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Audio devices and affected programs
+      description: Include which device is Output A and which are copied outputs.
+  - type: textarea
+    attributes:
+      label: Relevant log excerpt
+      description: Logs are in %LOCALAPPDATA%\VolumeMixer\mixer.log. Remove private paths or other personal information before posting.

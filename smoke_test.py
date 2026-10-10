@@ -43,6 +43,10 @@ def main():
     root.update()
     assert root.winfo_width() >= 860
     root.close()
+    # Collect Tk variables on the UI thread before starting audio workers.
+    import gc
+    del root
+    gc.collect()
     audio.routing.close()
     print("UI smoke test passed.")
 
@@ -74,9 +78,11 @@ with sc.get_speaker(__import__('sys').argv[1]).player(samplerate=48000, channels
             assert not bridge.error, bridge.error
             assert bridge.get_delay(physical[1].id) == 100
         finally:
-            bridge.stop()
-            helper.terminate()
-            helper.wait(timeout=5)
+            try:
+                bridge.stop()
+            finally:
+                helper.terminate()
+                helper.wait(timeout=5)
         print('Driver-free process capture, physical extra output, live delay adjustment, and shutdown passed with a silent source.')
     else:
         print('Driver-free playback smoke skipped: two connected physical outputs required.')
