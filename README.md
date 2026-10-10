@@ -4,7 +4,7 @@ A Windows desktop mixer with friendly application names, per-program volume and 
 
 ## Run
 
-Double-click `dist-driver-free/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
+Double-click `dist-scroll-fix/VolumeMixer/VolumeMixer.exe` after building. Keep the entire `VolumeMixer` folder together; the executable does not need a separate Python installation.
 
 For development, install Python 3.11 or newer on Windows 10/11, then run:
 
@@ -25,6 +25,8 @@ Start playback in a program and click **Refresh devices & apps**. The Programs t
 Cards show the friendly application name above the executable name and PID. Names come from Windows product metadata, common application/helper names, or the audio-session name, with a readable filename fallback. Separate processes remain separate cards, even if their friendly names match.
 
 The Input & output tab adjusts each physical or virtual endpoint's volume and mute. Microphone volume applies to the microphone device, affecting programs using it. Windows does not expose a universal independent capture-volume slider for every other program.
+
+The mouse wheel scrolls the page without changing dropdown selections or numeric fields. Select devices and presets using the dropdown or keyboard.
 
 Refresh reads current Windows levels. Sliders do not automatically track changes made outside the app. New/closed programs and hotplugged devices appear on refresh. Applications using exclusive audio mode may bypass shared-session controls.
 

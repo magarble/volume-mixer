@@ -15,3 +15,4 @@ dist-inline/
 .env.*
 dist-no-boost/
 dist-driver-free/
+dist-scroll-fix/

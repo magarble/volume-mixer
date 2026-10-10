@@ -61,6 +61,12 @@ class Mixer(tk.Tk):
         ttk.Label(self, text="Your sound, program by program.", foreground=MUTED, padding=(26, 0)).pack(anchor="w")
         tabs = ttk.Notebook(self)
         self.tabs = tabs
+        self.scroll_canvases = {}
+        # Widget class bindings run before bind_all and normally change values.
+        # Handle their wheel events here, then stop the default value change.
+        for widget_class in ('TCombobox', 'TSpinbox'):
+            self.bind_class(widget_class, '<MouseWheel>', self.scroll_control)
+        self.bind_all('<MouseWheel>', self.scroll_page, add='+')
         tabs.pack(fill="both", expand=True, padx=26, pady=18)
         self.apps_frame = self.scroll_tab(tabs, "Programs")
         self.devices_frame = self.scroll_tab(tabs, "Input & output")
@@ -102,9 +108,26 @@ class Mixer(tk.Tk):
         window = canvas.create_window((0, 0), window=inner, anchor="nw")
         inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda e: canvas.itemconfigure(window, width=e.width))
-        outer.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", lambda ev: canvas.yview_scroll(int(-ev.delta / 120), "units")))
-        outer.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        self.scroll_canvases[str(outer)] = canvas
         return inner
+
+    def scroll_page(self, event):
+        widget = self.winfo_containing(event.x_root, event.y_root)
+        if widget is None:
+            return
+        while widget is not None:
+            canvas = self.scroll_canvases.get(str(widget))
+            if canvas is not None:
+                units = int(-event.delta / 120)
+                if not units and event.delta:
+                    units = -1 if event.delta > 0 else 1
+                canvas.yview_scroll(units, 'units')
+                return 'break'
+            widget = getattr(widget, 'master', None)
+
+    def scroll_control(self, event):
+        self.scroll_page(event)
+        return 'break'
 
     def action(self, callback, success=None):
         try:
